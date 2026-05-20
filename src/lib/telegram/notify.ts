@@ -185,3 +185,45 @@ export async function notifyEventReminder(
   }
   return true;
 }
+
+export interface PurchaseInfo {
+  tgChatId: number;
+  locale: "uk" | "ru";
+  productTitle: string;
+  /** Amount in major units (e.g. "199.00"). */
+  amount: string;
+  currency: string;
+}
+
+function purchaseText(info: PurchaseInfo): string {
+  const amount = `${info.amount} ${info.currency}`;
+  if (info.locale === "ru") {
+    return [
+      `Оплата подтверждена.`,
+      `${info.productTitle} — ${amount}.`,
+      `Доступ открыт. В ближайшее время пришлю ссылку на личный кабинет и расписание Immersion Week.`,
+    ].join("\n");
+  }
+  return [
+    `Оплату підтверджено.`,
+    `${info.productTitle} — ${amount}.`,
+    `Доступ відкрито. Найближчим часом надішлю посилання на кабінет і розклад Immersion Week.`,
+  ].join("\n");
+}
+
+/**
+ * Best-effort post-purchase DM. Never throws.
+ */
+export async function notifyPurchase(info: PurchaseInfo): Promise<boolean> {
+  if (!isTelegramConfigured()) return false;
+  const res = await sendMessage({
+    chat_id: info.tgChatId,
+    text: purchaseText(info),
+    disable_web_page_preview: true,
+  });
+  if (!res.ok) {
+    console.warn("[tg:notify:purchase_failed]", res.description);
+    return false;
+  }
+  return true;
+}

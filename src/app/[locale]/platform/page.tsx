@@ -10,6 +10,7 @@ import { DeliverySystem } from "@/components/sections/platform/delivery";
 import { EcosystemStats } from "@/components/sections/platform/stats";
 import { MobilePwa } from "@/components/sections/platform/mobile";
 import { PlatformCta } from "@/components/sections/platform/platform-cta";
+import { PricingSection } from "@/components/sections/pricing";
 
 export async function generateMetadata({
   params,
@@ -49,6 +50,7 @@ export default async function PlatformPage({
         <DeliverySystem />
         <EcosystemStats />
         <MobilePwa />
+        <PricingSection />
         <PlatformCta />
       </main>
       <Footer />
