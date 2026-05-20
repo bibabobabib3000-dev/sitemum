@@ -34,6 +34,20 @@ export async function generateMetadata({
   return {
     title: t("title"),
     description: t("description"),
+    manifest: "/manifest.webmanifest",
+    applicationName: "RESOUL",
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: "black-translucent",
+      title: "RESOUL",
+    },
+    icons: {
+      icon: [
+        { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+        { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+      ],
+      apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+    },
     openGraph: {
       title: t("title"),
       description: t("description"),
@@ -41,6 +55,10 @@ export async function generateMetadata({
     },
   };
 }
+
+export const viewport = {
+  themeColor: "#0a0a0a",
+};
 
 export default async function LocaleLayout({
   children,
