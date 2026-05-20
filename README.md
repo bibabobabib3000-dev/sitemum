@@ -358,6 +358,83 @@ MonoPay flow ідентичний, тільки замість HTML-форми A
 `/api/pay/mono/create` повертають 503, лід-форма продовжує показувати свій
 thank-you екран.
 
+## Auth + Cabinet (PR #8)
+
+Безпарольний вхід через magic-link (Resend) і базовий каркас особистого
+кабінету з трьома тайлами (Рівні, Платежі, Карта станів-заглушка).
+
+### Файли
+
+- `migrations/0005_auth.sql` — `email_verifications` (зберігаємо тільки
+  `sha256(token)`, raw-токен ніколи не лежить у БД).
+- `src/lib/auth/session.ts` — cookie-сесія `resoul_session`:
+  base64url(payload).base64url(HMAC-SHA256(payload, AUTH_COOKIE_SECRET)).
+  Payload `{ uid, exp }`, TTL 30 днів, `httpOnly + secure + sameSite=lax`.
+- `src/lib/auth/magic-link.ts` — `generateRawToken()` (32B random
+  base64url), `issueMagicLink({email,locale})` (upsert у `users` по email +
+  insert у `email_verifications`), `consumeMagicLink(token)`
+  (`update ... where token_hash and consumed_at is null and created_at >
+  now() - make_interval(mins => 30)`).
+- `src/lib/auth/access-read.ts` — `listAccess(userId)`,
+  `listRecentPayments(userId, limit)` для тайлів кабінету.
+- `src/lib/email/resend.ts` — мінімальний fetch-клієнт Resend
+  (`POST https://api.resend.com/emails` з Bearer токеном).
+- `src/lib/email/templates/magic-link.ts` — інлайн-HTML шаблон листа
+  (UK/RU). Без зайвих залежностей — звичайний HTML рядок, безпечний для
+  email-клієнтів.
+- `src/app/api/auth/request-link/route.ts` — edge POST. Zod-валідація
+  `{ email, locale }`, ніколи не розкриває, чи existує email.
+- `src/app/api/auth/verify/route.ts` — edge GET. Consume token, `setSession`,
+  302 на `/{locale}/dashboard`. Помилки → `/{locale}/login?status=<reason>`.
+- `src/app/api/auth/logout/route.ts` — edge GET/POST. Очищує cookie і
+  302 на `/{locale}`.
+- `src/app/[locale]/login/page.tsx` + `src/components/auth/login-form.tsx`
+  — форма з email, тостами `statusExpired/statusMissing/statusDisabled`
+  з query.
+- `src/app/[locale]/dashboard/layout.tsx` — gated: `getSession()` → null
+  → `redirect("/login")`. Спільна nav (Огляд / Карта станів / Вийти).
+- `src/app/[locale]/dashboard/page.tsx` — рендер трьох тайлів.
+- `src/app/[locale]/dashboard/states/page.tsx` — заглушка під PR #9.
+- `src/components/dashboard/{tile-level,tile-history,tile-states}.tsx`
+  — серверні тайли.
+- `src/components/sections/nav.tsx` — тепер async server wrapper, що
+  читає сесію і передає `hasSession` у клієнтський `nav-inner.tsx`.
+
+### Потік
+
+```
+/login → form → POST /api/auth/request-link
+  -> issueMagicLink: upsert users by email, insert email_verifications (token_hash only)
+  -> Resend → magic-link https://host/api/auth/verify?token=<raw>&locale=<uk|ru>
+User кліком
+  -> GET /api/auth/verify
+       -> consumeMagicLink: UPDATE email_verifications SET consumed_at=now() WHERE token_hash and not consumed and fresh
+       -> setSession(userId)  (HMAC-підписаний cookie на 30 днів)
+       -> 302 → /uk/dashboard
+/dashboard layout
+  -> getSession() → null → redirect /login
+  -> SELECT access + payments WHERE user_id → рендер тайлів
+```
+
+### Сетап після деплою
+
+1. **Migration**: `psql "$DATABASE_URL" -f migrations/0005_auth.sql`.
+2. **Resend**:
+   - Зареєструватися на [resend.com](https://resend.com), додати домен,
+     підтвердити DKIM/SPF/DMARC.
+   - Створити API key → виставити `RESEND_API_KEY` у Vercel.
+   - Виставити `EMAIL_FROM`, наприклад `RESOUL <login@resoul.app>`. Адреса
+     повинна бути у підтвердженому домені.
+3. **Cookie secret**: `openssl rand -hex 32` → виставити
+   `AUTH_COOKIE_SECRET` у Vercel.
+4. **`NEXT_PUBLIC_SITE_URL`** має вказувати на production-домен (без
+   trailing slash) — magic-link генерується з нього.
+
+Без жодного з цих ENV вхід просто не активується: `/api/auth/request-link`
+повертає 503 (без `AUTH_COOKIE_SECRET`) або `{ sent: false }` (без Resend
+кредів), і ми ніколи не показуємо raw-токен у відповіді HTTP. У dev raw
+посилання можна підняти з Vercel runtime logs (`[auth:request_link:stub]`).
+
 ## Roadmap
 
 Послідовність PR-ів:
