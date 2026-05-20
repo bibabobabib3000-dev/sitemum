@@ -435,6 +435,93 @@ User кліком
 кредів), і ми ніколи не показуємо raw-токен у відповіді HTTP. У dev raw
 посилання можна підняти з Vercel runtime logs (`[auth:request_link:stub]`).
 
+## Drip courses + R2 storage (PR #9)
+
+Реальний курс-плеєр для Immersion Week (Level 0): сторінка зі списком 5
+уроків, drip-розблокування (по 1 уроку на день з моменту першого відкриття
+курсу), окрема сторінка уроку з плеєром, формою домашнього і бібліотекою
+активів. Сховище — Cloudflare R2 через S3-сумісні presigned URLs (без AWS
+SDK — все на Web Crypto).
+
+### Файли
+
+- `migrations/0006_courses.sql` — `courses`, `lessons` (з `day_offset`,
+  `video_key`, `audio_key`, `asset_keys[]`), `enrollments`,
+  `homework_submissions`. У кінці — idempotent сід Immersion Week
+  (`level-0`) з 5 уроками.
+- `src/lib/storage/r2.ts` — `presign({ method, key, ttlSec, contentType })`,
+  тонкі обгортки `r2SignedGet` / `r2SignedPut` і `r2PublicUrl(key)` для
+  R2_PUBLIC_DOMAIN. Pure AWS SigV4 query-string auth.
+- `src/lib/courses/drip.ts` — `isUnlocked(now, startedAt, dayOffset)` і
+  `unlockInfo(...)` з `daysUntilUnlock`.
+- `src/lib/courses/access.ts` — `getCourse`, `listLessons`, `getLesson`,
+  `getLessonById`, `getEnrollment`, `ensureEnrollment` (upsert),
+  `canEnterCourse` (через `hasAccess` з PR #7), `recordHomework`,
+  `listHomework`.
+- `src/app/api/lessons/[id]/sign/route.ts` — edge GET. Перевіряє сесію,
+  доступ і drip-стан, потім повертає `{ videoUrl, audioUrl, ttlSec }`
+  з presigned R2 URLs (1 година).
+- `src/app/api/upload/sign/route.ts` — edge POST. Видає presigned PUT
+  для `homework/{userId}/{ts}_{file}`. Allow-list типів (`image/*`,
+  `audio/*`, `video/*`, `application/pdf`), ліміт 25 MB.
+- `src/app/api/homework/submit/route.ts` — edge POST. Записує
+  `homework_submissions` (текст + url + file_keys), вимагає хоча б одне.
+- `src/app/[locale]/dashboard/level-0/page.tsx` — список уроків з drip
+  бейджами (`Доступно` / `Відкриється за N дн.`).
+- `src/app/[locale]/dashboard/level-0/[lessonSlug]/page.tsx` — сторінка
+  уроку з плеєром, тілом (мінімалістичний markdown без deps), бібліотекою
+  і формою ДЗ. Locked → 302 на список курсу.
+- `src/components/courses/lesson-player.tsx` — client, `<video>` з
+  fetched signed URL і опціональним аудіо-fallback.
+- `src/components/courses/homework-form.tsx` — client, текст + url + N
+  файлів (presign → PUT → submit з `file_keys`).
+- `src/components/courses/library.tsx` — server, посилання на
+  `r2PublicUrl(key)` для public активів.
+
+### Потік
+
+```
+/uk/dashboard/level-0
+  -> require session
+  -> canEnterCourse(uid, "level-0") → hasAccess(uid, "level-0") з payments.PR#7
+  -> ensureEnrollment(uid, "level-0") → upsert (user_id, course_slug, started_at)
+  -> listLessons("level-0") → 5 уроків
+  -> для кожного: isUnlocked(now, startedAt, day_offset) → бейдж/лінк
+
+/uk/dashboard/level-0/d1-structure
+  -> ті ж перевірки + lesson існує + isUnlocked → 302 якщо ні
+  -> <LessonPlayer> → GET /api/lessons/<id>/sign → {videoUrl, audioUrl}
+       -> presigned R2 GET, 1 година
+  -> <HomeworkForm> → POST /api/upload/sign per file → PUT до R2 → POST /api/homework/submit
+```
+
+### Сетап після деплою
+
+1. **Migration**: `psql "$DATABASE_URL" -f migrations/0006_courses.sql`.
+   Сід уроків ідемпотентний — повторні запуски нічого не дублюють.
+2. **Cloudflare R2**:
+   - Створити R2 bucket (наприклад `resoul-content`).
+   - R2 → Manage API Tokens → Create token (Object Read & Write обмежений
+     цим бакетом) → виставити `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`,
+     `R2_ACCOUNT_ID`, `R2_BUCKET` у Vercel.
+   - (Опц.) Підключити кастомний домен у R2 → виставити
+     `R2_PUBLIC_DOMAIN` для бібліотеки публічних активів.
+3. **Завантажити контент**:
+   - Через консоль R2 (drag-and-drop) або `aws s3 cp --endpoint-url
+     https://<account>.r2.cloudflarestorage.com s3://<bucket>/lessons/d1.mp4`.
+   - Прописати ключ у БД:
+     `update lessons set video_key='lessons/d1.mp4' where slug='d1-structure';`
+4. Якщо R2 не налаштований — уроки рендеряться з текстом і пустим
+   плеєром (`Відео ще не залите`). Завантажений markdown-body все одно
+   видно.
+
+Безпека:
+- `/api/lessons/:id/sign` ніколи не повертає URL без верифікації доступу і
+  drip-стану. Signed URL живе максимум 1 годину.
+- `/api/upload/sign` обмежений content-type allow-list, ключі скоупові на
+  `homework/{userId}/...`, ліміт 25 MB.
+- Homework пам'ять append-only — нічого не редагуємо/не видаляємо.
+
 ## Roadmap
 
 Послідовність PR-ів:
