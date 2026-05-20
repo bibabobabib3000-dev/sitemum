@@ -3,6 +3,7 @@ import { SiteNav } from "@/components/sections/nav";
 import { Hero } from "@/components/sections/hero";
 import { ProblemPromise } from "@/components/sections/problem-promise";
 import { Method } from "@/components/sections/method";
+import { PlatformTeaser } from "@/components/sections/platform-teaser";
 import { Program } from "@/components/sections/program";
 import { Author } from "@/components/sections/author";
 import { Faq } from "@/components/sections/faq";
@@ -24,6 +25,7 @@ export default async function HomePage({
         <Hero />
         <ProblemPromise />
         <Method />
+        <PlatformTeaser />
         <Program />
         <Author />
         <Faq />
