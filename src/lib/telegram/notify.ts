@@ -130,3 +130,58 @@ export async function notifyLeadAdmin(info: NewLeadInfo): Promise<void> {
 export async function notifyNewLead(info: NewLeadInfo): Promise<void> {
   await Promise.allSettled([notifyLeadUser(info), notifyLeadAdmin(info)]);
 }
+
+export interface EventReminderInfo {
+  tgChatId: number;
+  locale: "uk" | "ru";
+  topic: string;
+  startAtIso: string;
+  joinUrl: string;
+  minutesBefore: 60 | 15;
+}
+
+function eventReminderText(info: EventReminderInfo): string {
+  const minutes = info.minutesBefore;
+  const start = new Date(info.startAtIso)
+    .toISOString()
+    .replace("T", " ")
+    .slice(0, 16);
+  if (info.locale === "ru") {
+    return [
+      `${info.topic}`,
+      ``,
+      minutes === 60
+        ? `Через час — ${start} UTC. Ссылка для входа в Zoom:`
+        : `Через 15 минут — ${start} UTC. Заходи в Zoom прямо сейчас:`,
+      info.joinUrl,
+    ].join("\n");
+  }
+  return [
+    `${info.topic}`,
+    ``,
+    minutes === 60
+      ? `За годину — ${start} UTC. Посилання на Zoom:`
+      : `За 15 хвилин — ${start} UTC. Заходь у Zoom уже зараз:`,
+    info.joinUrl,
+  ].join("\n");
+}
+
+/**
+ * Sends a Zoom reminder DM. Returns true on confirmed Telegram success so
+ * the cron job knows whether to flip reminder_*_sent_at.
+ */
+export async function notifyEventReminder(
+  info: EventReminderInfo
+): Promise<boolean> {
+  if (!isTelegramConfigured()) return false;
+  const res = await sendMessage({
+    chat_id: info.tgChatId,
+    text: eventReminderText(info),
+    disable_web_page_preview: false,
+  });
+  if (!res.ok) {
+    console.warn("[tg:notify:event_reminder_failed]", res.description);
+    return false;
+  }
+  return true;
+}

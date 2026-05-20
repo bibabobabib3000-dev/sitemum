@@ -217,6 +217,74 @@ node scripts/telegram-set-webhook.mjs https://resoul.app/api/telegram/webhook
 node scripts/telegram-set-webhook.mjs --info
 ```
 
+## Live Zoom event flow (PR #6)
+
+`/[locale]/event/live` — лендінг живої події (День 5 Immersion Week): таймер
+зворотного відліку, кнопка «Я буду» і кнопка «Приєднатись до Zoom», яка
+зʼявляється рівно у вікно події.
+
+### Файли
+
+- `migrations/0003_events.sql` — таблиці `events`, `event_attendees`
+  (з колонками `reminder_60_sent_at` / `reminder_15_sent_at` / `joined_at`).
+- `src/lib/zoom/oauth.ts` + `client.ts` — Server-to-Server OAuth з кешем
+  токена (5-хв буфер) + `createMeeting`/`getMeeting`.
+- `src/lib/zoom/webhook.ts` — HMAC-SHA256 через Web Crypto: validation
+  challenge + `x-zm-signature` перевірка.
+- `src/lib/events/repo.ts` — DB-хелпери: `getEventBySlug`, `registerAttendee`
+  (`on conflict do nothing`), `getPendingReminders`, `markReminderSent`,
+  `markAttendeeJoined`.
+- `src/app/api/event/register/route.ts` — POST з Zod-валідацією slug + uuid.
+- `src/app/api/zoom/webhook/route.ts` — приймає `endpoint.url_validation` і
+  `meeting.participant_joined`. Без `ZOOM_WEBHOOK_SECRET_TOKEN` 503 на
+  validation і дев-режим перевірки підпису.
+- `src/app/api/cron/zoom-reminders/route.ts` — викликається Vercel cron-ом,
+  шле 60-хв і 15-хв нагадування через Telegram-бота.
+- `vercel.json` — `*/5 * * * *` для `/api/cron/zoom-reminders`.
+
+### Потік
+
+```
+Admin створює подію (одноразово, через SQL або createMeeting):
+  events row (slug, start_at, zoom_meeting_id, zoom_join_url)
+
+User /uk/event/live?slug=immersion-w5&u=<userId>
+  -> бачить countdown (client)
+  -> натискає "Я буду"
+  -> POST /api/event/register { eventSlug, userId }
+       -> event_attendees row (registered_at = now())
+  -> у момент start_at JoinCta показує кнопку → Zoom
+
+Vercel cron */5min -> /api/cron/zoom-reminders
+  -> SELECT attendees зі start_at у вікнах [now+57..63] / [now+12..18]
+  -> notifyEventReminder(...) (TG DM з joinUrl)
+  -> UPDATE reminder_60_sent_at / reminder_15_sent_at
+
+Zoom Marketplace -> /api/zoom/webhook
+  -> meeting.participant_joined { email }
+  -> UPDATE event_attendees.joined_at WHERE u.email = participant.email
+```
+
+### Сетап після деплою
+
+1. **Migration**: `psql "$DATABASE_URL" -f migrations/0003_events.sql`.
+2. **Подія**: створити рядок у `events` (наприклад через psql) з валідним
+   `start_at` (UTC) і, після створення Zoom-мітингу, заповнити
+   `zoom_meeting_id` + `zoom_join_url`.
+3. **Zoom Server-to-Server OAuth**: створити app у Zoom Marketplace,
+   виставити `ZOOM_ACCOUNT_ID` / `ZOOM_CLIENT_ID` / `ZOOM_CLIENT_SECRET`.
+4. **Zoom webhook**: у тому ж app → Feature → Event Subscriptions додати
+   `meeting.participant_joined`, endpoint `https://<host>/api/zoom/webhook`,
+   виставити `ZOOM_WEBHOOK_SECRET_TOKEN` у Vercel і у app.
+5. **Vercel cron**: задеплоїти `vercel.json` (cron підхопиться автоматично
+   у Project Settings → Cron Jobs). Виставити `CRON_SECRET` (random string)
+   у Project Settings → Environment Variables.
+
+Усе працює graceful: без `DATABASE_URL` сторінка показує `notFound`-секцію,
+без `TELEGRAM_BOT_TOKEN` нагадування пропускаються (але `sent_at` все одно
+ставиться, щоб не повторювати спроби), без Zoom-кредів кнопка `Join` просто
+не зʼявляється.
+
 ## Roadmap
 
 Послідовність PR-ів:
