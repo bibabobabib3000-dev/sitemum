@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/cron/zoom-reminders",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}
