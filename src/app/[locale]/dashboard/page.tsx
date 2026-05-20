@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { getSession } from "@/lib/auth/session";
 import { listAccess, listRecentPayments } from "@/lib/auth/access-read";
+import { getLevel2Gate } from "@/lib/courses/access";
 import { TileLevel } from "@/components/dashboard/tile-level";
 import { TileHistory } from "@/components/dashboard/tile-history";
 import { TileStates } from "@/components/dashboard/tile-states";
+import { TileCertificate } from "@/components/dashboard/tile-certificate";
 
 export async function generateMetadata({
   params,
@@ -33,9 +35,16 @@ export default async function DashboardPage({
   const session = await getSession();
   const userId = session?.uid ?? null;
 
-  const [access, payments] = await Promise.all([
+  const [access, payments, level2Gate] = await Promise.all([
     userId ? listAccess(userId) : Promise.resolve([]),
     userId ? listRecentPayments(userId, 8) : Promise.resolve([]),
+    userId
+      ? getLevel2Gate(userId)
+      : Promise.resolve({
+          hasLevel2Access: false,
+          caseStudy: "missing" as const,
+          certificate: false,
+        }),
   ]);
 
   const ownedSlugs = new Set(access.map((a) => a.productSlug));
@@ -51,6 +60,13 @@ export default async function DashboardPage({
         <TileLevel locale={locale} ownedSlugs={ownedSlugs} />
         <TileHistory locale={locale} payments={payments} />
         <TileStates locale={locale} />
+        {level2Gate.hasLevel2Access ? (
+          <TileCertificate
+            locale={locale}
+            status={level2Gate.caseStudy}
+            certificateReady={level2Gate.certificate}
+          />
+        ) : null}
       </div>
     </div>
   );
