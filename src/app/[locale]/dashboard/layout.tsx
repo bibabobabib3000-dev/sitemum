@@ -39,6 +39,12 @@ export default async function DashboardLayout({
               {t("overview")}
             </Link>
             <Link
+              href="/dashboard/roadmap"
+              className="text-foreground/60 transition-colors hover:text-foreground"
+            >
+              {t("roadmap")}
+            </Link>
+            <Link
               href="/dashboard/states"
               className="text-foreground/60 transition-colors hover:text-foreground"
             >
