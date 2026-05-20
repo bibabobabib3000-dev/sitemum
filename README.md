@@ -167,6 +167,56 @@ psql "$DATABASE_URL" -f migrations/0002_tg_users.sql
 
 Якщо `TELEGRAM_BOT_TOKEN` не виставлено, інтеграція — no-op, форма й DB-частина працюють як раніше.
 
+## Meta Pixel + Conversions API (PR #5)
+
+Дві ноги одного й того самого івента `Lead` — на клієнті через `fbq` і на сервері через Conversions API. Meta дедуплікує події по спільному `event_id`, тому статистика залишається чистою навіть якщо AdBlock прибив браузерний піксель.
+
+Файли:
+
+- `src/lib/analytics/pixel.ts` — ENV-хелпери (`isPixelConfigured`, `pixelId`, `capiAccessToken`, `pixelTestCode`).
+- `src/lib/analytics/capi.ts` — `sendCapiEvent` + `hashUserData` (SHA-256 через Web Crypto, працює в Edge runtime).
+- `src/components/analytics/pixel-script.tsx` — Server Component із канонічним `fbq` init-скриптом і `<noscript>` fallback. Якщо `NEXT_PUBLIC_META_PIXEL_ID` не виставлено — рендерить `null`.
+- `src/app/api/capi/lead/route.ts` — серверний CAPI-роут (POST). Перевіряє схему через Zod, читає `_fbp`/`_fbc` з cookies, додає IP + UA.
+
+Потік для конверсії `Lead`:
+
+```
+User submit form
+  -> client: lead-form.tsx
+       eventId = crypto.randomUUID()
+       fbq('track','Lead', { content_name }, { eventID: eventId })   // browser pixel
+       POST /api/lead { ..., eventId }
+  -> server: /api/lead
+       Zod -> Neon upsert/insert -> notifyNewLead(...)
+       -> sendCapiEvent({ eventName:'Lead', eventId, email, fbp, fbc, ip, ua })
+       -> return jsonOk({ stored, userId, mode, capiSent })
+```
+
+### Сетап після деплою
+
+1. У Meta Events Manager створити Pixel і скопіювати ID (`NEXT_PUBLIC_META_PIXEL_ID`).
+2. Settings → Generate access token → отримати CAPI-токен (`META_CAPI_TOKEN`).
+3. (Опц.) Test events → скопіювати `TEST12345`-код у `META_PIXEL_TEST_CODE` для перевірки.
+4. Виставити змінні у Vercel і ре-деплоїти.
+5. Відкрити сайт у браузері з установленим [Meta Pixel Helper](https://chromewebstore.google.com/detail/meta-pixel-helper/fdgfkebogiimcoedlicjlajpkdmockpc) — переконатися, що `PageView` фіксується. Відправити форму — побачити `Lead` (одну подію, дедуплікована).
+
+### Telegram bot (prod)
+
+Цей PR не змінює код бота, але є операційні кроки для production-вмикання (PR #3 уже вмерджено):
+
+```bash
+# 1. @BotFather → /newbot → RESOULMethodBot (або інше імʼя).
+# 2. У Vercel виставити:
+#    TELEGRAM_BOT_TOKEN=<токен від BotFather>
+#    TELEGRAM_WEBHOOK_SECRET=$(openssl rand -hex 24)
+#    NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=resoulmethodbot
+#    TELEGRAM_ADMIN_CHAT_ID=<твій chat_id>
+# 3. Прив'язати webhook:
+node scripts/telegram-set-webhook.mjs https://resoul.app/api/telegram/webhook
+# 4. Перевірити статус:
+node scripts/telegram-set-webhook.mjs --info
+```
+
 ## Roadmap
 
 Послідовність PR-ів:

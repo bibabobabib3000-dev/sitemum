@@ -4,6 +4,7 @@ import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { routing } from "@/i18n/routing";
+import { PixelScript } from "@/components/analytics/pixel-script";
 
 const inter = Inter({
   subsets: ["latin", "cyrillic"],
@@ -60,6 +61,7 @@ export default async function LocaleLayout({
     <html lang={locale} className={`${inter.variable} ${instrumentSerif.variable}`}>
       <body className="font-sans antialiased min-h-screen bg-background text-foreground">
         <NextIntlClientProvider>{children}</NextIntlClientProvider>
+        <PixelScript />
       </body>
     </html>
   );
