@@ -1,16 +1,22 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import { Container } from "@/components/ui/container";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
-const NAV_LINKS = [
-  { href: "#method", key: "method" as const },
-  { href: "#program", key: "program" as const },
-  { href: "#about", key: "about" as const },
-  { href: "#faq", key: "faq" as const },
+type NavLink =
+  | { key: "method" | "program" | "about" | "faq"; href: string; external?: false }
+  | { key: "platform"; href: "/platform"; external: true };
+
+const NAV_LINKS: NavLink[] = [
+  { href: "#method", key: "method" },
+  { href: "#program", key: "program" },
+  { href: "/platform", key: "platform", external: true },
+  { href: "#about", key: "about" },
+  { href: "#faq", key: "faq" },
 ];
 
 export function SiteNav() {
@@ -34,28 +40,38 @@ export function SiteNav() {
       )}
     >
       <Container className="flex h-16 items-center justify-between">
-        <a href="#top" className="font-display text-xl tracking-tight">
+        <Link href="/" className="font-display text-xl tracking-tight">
           RESOUL
-        </a>
+        </Link>
         <nav className="hidden items-center gap-7 md:flex">
-          {NAV_LINKS.map((l) => (
-            <a
-              key={l.key}
-              href={l.href}
-              className="text-sm text-foreground/70 transition-colors hover:text-foreground"
-            >
-              {t(l.key)}
-            </a>
-          ))}
+          {NAV_LINKS.map((l) =>
+            l.external ? (
+              <Link
+                key={l.key}
+                href={l.href}
+                className="text-sm text-foreground/70 transition-colors hover:text-foreground"
+              >
+                {t(l.key)}
+              </Link>
+            ) : (
+              <a
+                key={l.key}
+                href={l.href}
+                className="text-sm text-foreground/70 transition-colors hover:text-foreground"
+              >
+                {t(l.key)}
+              </a>
+            )
+          )}
         </nav>
         <div className="flex items-center gap-3">
           <LanguageSwitcher />
-          <a
-            href="#form"
+          <Link
+            href="/#form"
             className="hidden rounded-full bg-foreground px-5 py-2 text-xs font-medium text-background transition-colors hover:bg-foreground/90 sm:inline-flex"
           >
             {t("cta")}
-          </a>
+          </Link>
         </div>
       </Container>
     </header>
