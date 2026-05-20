@@ -1,6 +1,12 @@
 import { getDb, isDbConfigured } from "@/lib/db";
 import { hasAccess } from "@/lib/payments/access";
 import type { ProductSlug } from "@/lib/payments/catalog";
+import {
+  canIssueCertificate as canIssueLevel2Certificate,
+  caseStudyStatus,
+  getCaseStudy,
+  type CaseStudyStatus,
+} from "@/lib/courses/certificate";
 
 /**
  * Repo helpers and access gates for the courses layer.
@@ -239,6 +245,39 @@ export async function canEnterCourse(
   if (!product) return false;
   return hasAccess(userId, product);
 }
+
+/**
+ * Level 2 certificate gate.
+ *
+ * Returns whether the certificate can be issued today AND the current state
+ * of the case study (so the dashboard can render the right CTA without a
+ * second roundtrip).
+ *
+ * - `caseStudy: "missing"` → user has not submitted the case study form.
+ * - `caseStudy: "pending"` → submitted, awaiting admin approval.
+ * - `caseStudy: "approved"` → cleared; `certificate` is true iff the user
+ *   also owns the `level-2` product.
+ */
+export interface Level2GateState {
+  hasLevel2Access: boolean;
+  caseStudy: CaseStudyStatus;
+  certificate: boolean;
+}
+
+export async function getLevel2Gate(userId: string): Promise<Level2GateState> {
+  const [owns, cs] = await Promise.all([
+    hasAccess(userId, "level-2"),
+    getCaseStudy(userId),
+  ]);
+  const status = caseStudyStatus(cs);
+  return {
+    hasLevel2Access: owns,
+    caseStudy: status,
+    certificate: owns && status === "approved",
+  };
+}
+
+export { canIssueLevel2Certificate };
 
 export interface HomeworkSubmissionInput {
   userId: string;
