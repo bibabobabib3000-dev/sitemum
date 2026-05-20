@@ -285,6 +285,79 @@ Zoom Marketplace -> /api/zoom/webhook
 ставиться, щоб не повторювати спроби), без Zoom-кредів кнопка `Join` просто
 не зʼявляється.
 
+## Payments (PR #7)
+
+Підтримуємо два провайдери — **WayForPay** (основний, UA) і **MonoPay**
+(резервний, UA). Обидва ідемпотентні через unique-index
+`payments(provider, provider_ref)`. Усі суми зберігаються в копійках.
+
+### Файли
+
+- `migrations/0004_payments.sql` — `payments` (з `raw jsonb`) + `access`.
+- `src/lib/payments/catalog.ts` — продукти (`level-0`, `level-1`, `level-2`),
+  ціни в копійках, локалізовані заголовки.
+- `src/lib/payments/access.ts` — `recordPayment` (`on conflict do nothing`),
+  `grantAccess`, `hasAccess`, `getUserContact`.
+- `src/lib/payments/wayforpay/{sign,client}.ts` — HMAC-MD5 підпис інвойсу /
+  колбеку / acknowledgement (`node:crypto`); побудова payload для
+  `https://secure.wayforpay.com/pay`.
+- `src/lib/payments/mono/{sign,client}.ts` — ECDSA-SHA256 verify через Web
+  Crypto (P-256, DER → P1363 конвертація), `createMonoInvoice` через
+  `api.monobank.ua/api/merchant/invoice/create`.
+- `src/app/api/pay/wfp/create/route.ts` — Node-runtime, рендерить
+  auto-submit HTML-форму на WFP (бо WFP не приймає GET-параметри).
+- `src/app/api/pay/wfp/webhook/route.ts` — Node-runtime, parse +
+  signature verify + `recordPayment` + `grantAccess` + Telegram DM + CAPI
+  `Purchase`. Завжди повертає підписаний JSON-acknowledgement.
+- `src/app/api/pay/mono/create/route.ts` — Edge, 303 redirect на `pageUrl`.
+- `src/app/api/pay/mono/webhook/route.ts` — Edge, X-Sign verify, далі
+  така сама ланцюжкова логіка.
+- `src/components/sections/pricing.tsx` — секція з трьома планами на
+  `/[locale]/platform`.
+- `src/app/[locale]/event/paid/page.tsx` — post-payment лендінг.
+
+### Data flow (Level 0, UA, WayForPay)
+
+```
+User submit form
+  -> POST /api/lead -> { userId }
+  -> (якщо NEXT_PUBLIC_PAY_AFTER_LEAD=1) redirect to /api/pay/wfp/create?u=<userId>&p=level-0
+       -> рендерить auto-submit HTML-форму -> POST https://secure.wayforpay.com/pay
+User pays
+  WFP -> POST /api/pay/wfp/webhook
+       -> verify HMAC-MD5 signature
+       -> recordPayment (on conflict do nothing)
+       -> grantAccess(userId, "level-0")
+       -> notifyPurchase() (TG DM)
+       -> sendCapiEvent("Purchase", { eventId: `wfp_${orderRef}`, value, currency, email })
+       -> respond signed { status: "accept" }
+WFP -> redirect user -> /uk/event/paid?ref=<orderRef>
+```
+
+MonoPay flow ідентичний, тільки замість HTML-форми API повертає
+`pageUrl`, на який ми робимо 303 redirect.
+
+### Сетап після деплою
+
+1. **Migration**: `psql "$DATABASE_URL" -f migrations/0004_payments.sql`.
+2. **WayForPay** (основний):
+   - У кабінеті WayForPay → Merchant → Settings взяти Merchant Login
+     і Secret Key. Заповнити `WFP_MERCHANT_LOGIN`, `WFP_MERCHANT_SECRET`.
+   - Поставити `WFP_DOMAIN` рівним домену сайту (наприклад
+     `resoul.app`). Це той самий домен, що відправляється у
+     `merchantDomainName` поле інвойсу.
+   - У WFP кабінеті виставити Service URL = `https://<host>/api/pay/wfp/webhook`
+     і Return URL = `https://<host>/{locale}/event/paid` (вибирається динамічно).
+3. **MonoPay** (резервний):
+   - У MonoPay створити merchant → отримати X-Token, заповнити `MONO_TOKEN`.
+4. **Flow toggle**: щоб лід-форма одразу вела в касу — виставити
+   `NEXT_PUBLIC_PAY_AFTER_LEAD=1` у Vercel і ре-деплоїти. Без цього прапорця
+   форма зберігає попередню поведінку (thank-you екран).
+
+Без жодного з ENV пейменти просто не активуються: `/api/pay/wfp/create` і
+`/api/pay/mono/create` повертають 503, лід-форма продовжує показувати свій
+thank-you екран.
+
 ## Roadmap
 
 Послідовність PR-ів:

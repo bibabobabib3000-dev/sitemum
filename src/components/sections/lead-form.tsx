@@ -42,12 +42,18 @@ function readUtm(): Partial<Record<UtmKeys, string>> {
 }
 
 const TG_BOT = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || "";
+const PAY_AFTER_LEAD = process.env.NEXT_PUBLIC_PAY_AFTER_LEAD === "1";
 
 function buildBotDeepLink(userId: string | null): string {
   const bot = TG_BOT.replace(/^@+/, "");
   if (!bot) return "https://t.me";
   const base = `https://t.me/${bot}`;
   return userId ? `${base}?start=lead_${userId}` : base;
+}
+
+function paymentRedirectUrl(userId: string, productSlug: string): string {
+  const params = new URLSearchParams({ u: userId, p: productSlug });
+  return `/api/pay/wfp/create?${params.toString()}`;
 }
 
 export function LeadForm() {
@@ -109,6 +115,19 @@ export function LeadForm() {
         return;
       }
       setUserId(json.data.userId);
+
+      if (
+        PAY_AFTER_LEAD &&
+        json.data.userId &&
+        payload.productSlug === "level-0"
+      ) {
+        window.location.href = paymentRedirectUrl(
+          json.data.userId,
+          payload.productSlug
+        );
+        return;
+      }
+
       setDone(true);
     } catch {
       setErrorMsg(t("error"));
