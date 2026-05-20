@@ -97,13 +97,20 @@ src/
 │   ├── utils.ts                # cn()
 │   ├── api-response.ts         # jsonOk / jsonErr helpers
 │   ├── db/index.ts             # Neon client (graceful when DATABASE_URL unset)
+│   ├── telegram/
+│   │   ├── client.ts           # Bot API wrapper (sendMessage / setWebhook / …)
+│   │   ├── notify.ts           # best-effort DM lead + admin notification
+│   │   └── types.ts            # minimal Bot API types
 │   └── validation/schemas.ts   # Zod schemas (leadInputSchema)
 └── middleware.ts               # next-intl middleware
 messages/
 ├── uk.json
 └── ru.json
 migrations/
-└── 0001_init.sql               # users + leads tables
+├── 0001_init.sql               # users + leads tables
+└── 0002_tg_users.sql           # Telegram chat ↔ user mapping
+scripts/
+└── telegram-set-webhook.mjs    # one-off webhook setup CLI
 ```
 
 ## Дизайн-система
@@ -120,13 +127,53 @@ Default — темна тема (`#0a0a0a` / `#f5f5f4`). Cabinet (LMS) у май
 - Default locale: `uk`
 - `next-intl` middleware редіректить з `/` на `/uk`
 
+## Telegram bot (PR #3)
+
+Webhook-driven, без SDK — Bot API викликається через `fetch`, щоб працювати
+на Vercel Edge runtime. Основні файли:
+
+- `src/lib/telegram/client.ts` — обгортка навколо Bot API (sendMessage, getMe, setWebhook, deleteWebhook, getWebhookInfo).
+- `src/lib/telegram/notify.ts` — best-effort DM ліду + опціональна admin-нотифікація. При помилці TG лід усе одно зберігається.
+- `src/app/api/telegram/webhook/route.ts` — вхідний вебхук. Валідує `X-Telegram-Bot-Api-Secret-Token`, реєструє `chat_id` у `tg_users` і лінкує до `users` за deep-link payload (`/start lead_<userId>`) або за `@username`.
+- `migrations/0002_tg_users.sql` — схема для Neon.
+- `scripts/telegram-set-webhook.mjs` — одноразовий CLI для setWebhook / getWebhookInfo / deleteWebhook.
+
+### Сетап після деплою
+
+```bash
+# 1. У env-провайдера (Vercel / .env) виставити:
+#    TELEGRAM_BOT_TOKEN=...                      # від @BotFather
+#    TELEGRAM_WEBHOOK_SECRET=$(openssl rand -hex 24)
+#    NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=your_bot  # без @
+#    TELEGRAM_ADMIN_CHAT_ID=...                  # опціонально
+
+# 2. Прив'язати вебхук (виконується один раз на деплой):
+node scripts/telegram-set-webhook.mjs https://example.com/api/telegram/webhook
+
+# Перевірити статус:
+node scripts/telegram-set-webhook.mjs --info
+
+# 3. Застосувати міграцію (SQL editor у Neon або psql):
+psql "$DATABASE_URL" -f migrations/0002_tg_users.sql
+```
+
+### Потік
+
+1. Клієнт заповнює форму на лендінгу → `/api/lead` зберігає `users` + `leads` у Neon.
+2. Форма у success-стані показує CTA «Відкрити Telegram-бот» з deep-лінком `https://t.me/<bot>?start=lead_<userId>`.
+3. Користувач відкриває бота і натискає Start → Telegram б'є наш webhook з `/start lead_<userId>`.
+4. Webhook реєструє рядок у `tg_users`, лінкує до `users.id` і вітає ліда відповідною мовою (uk / ru за `language_code`).
+5. При наступних submit-ах `notifyNewLead` уже знає `chat_id` і надсилає DM без додаткових дій користувача.
+
+Якщо `TELEGRAM_BOT_TOKEN` не виставлено, інтеграція — no-op, форма й DB-частина працюють як раніше.
+
 ## Roadmap
 
-Поточний PR — це **PR #1 з ~8**. Послідовність наступних:
+Послідовність PR-ів:
 
 1. PR #1 — scaffold + Landing Level 0 *(merged)*
-2. PR #2 — **lead-форма + `/api/lead` + Neon (users + leads)** ← *цей PR*
-3. PR #3 — Telegram-бот (Telegraf на serverless)
+2. PR #2 — lead-форма + `/api/lead` + Neon (users + leads) *(merged)*
+3. PR #3 — **Telegram-бот (вебхук + DM лідам)** ← *цей PR*
 4. PR #4 — Landing Level 1 + динамічний банк кейсів
 5. PR #5 — Cabinet (LMS) MVP: auth, drip, відео-плеєр
 6. PR #6 — Zoom API + reminders

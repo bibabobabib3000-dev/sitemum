@@ -21,11 +21,21 @@ function readUtm(): Partial<Record<UtmKeys, string>> {
   return out;
 }
 
+const TG_BOT = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || "";
+
+function buildBotDeepLink(userId: string | null): string {
+  const bot = TG_BOT.replace(/^@+/, "");
+  if (!bot) return "https://t.me";
+  const base = `https://t.me/${bot}`;
+  return userId ? `${base}?start=lead_${userId}` : base;
+}
+
 export function LeadForm() {
   const t = useTranslations("form");
   const locale = useLocale();
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -52,7 +62,10 @@ export function LeadForm() {
         body: JSON.stringify(payload),
       });
       const json = (await res.json()) as
-        | { ok: true; data: unknown }
+        | {
+            ok: true;
+            data: { stored: boolean; userId: string | null; mode: "db" | "stub" };
+          }
         | { ok: false; error: { code: string; message: string } };
       if (!res.ok || !json.ok) {
         const msg = !json.ok ? json.error.message : t("error");
@@ -60,6 +73,7 @@ export function LeadForm() {
         setSubmitting(false);
         return;
       }
+      setUserId(json.data.userId);
       setDone(true);
     } catch {
       setErrorMsg(t("error"));
@@ -84,9 +98,24 @@ export function LeadForm() {
         {done ? (
           <div
             role="status"
-            className="mt-10 rounded-3xl border border-foreground/20 bg-background/60 p-8 text-center text-lg"
+            className="mt-10 rounded-3xl border border-foreground/20 bg-background/60 p-8 text-center"
           >
-            {t("success")}
+            <p className="text-lg">{t("success")}</p>
+            {TG_BOT ? (
+              <>
+                <p className="mt-4 text-sm text-foreground/70">
+                  {t("botHint")}
+                </p>
+                <a
+                  href={buildBotDeepLink(userId)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-6 inline-flex h-12 items-center rounded-full border border-foreground/40 bg-foreground/5 px-6 text-sm text-foreground hover:border-foreground hover:bg-foreground/10"
+                >
+                  {t("botCta")}
+                </a>
+              </>
+            ) : null}
           </div>
         ) : (
           <form

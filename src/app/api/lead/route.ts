@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getDb, isDbConfigured } from "@/lib/db";
 import { jsonErr, jsonOk } from "@/lib/api-response";
 import { leadInputSchema } from "@/lib/validation/schemas";
+import { notifyNewLead, type NewLeadInfo } from "@/lib/telegram/notify";
 
 export const runtime = "edge";
 
@@ -41,7 +42,8 @@ export async function POST(req: NextRequest) {
       userAgent,
       note: "DATABASE_URL not set — captured to stdout only",
     });
-    return jsonOk({ stored: false, mode: "stub" as const });
+    await notifyNewLead(toLeadInfo(input, null));
+    return jsonOk({ stored: false, userId: null, mode: "stub" as const });
   }
 
   const sql = getDb()!;
@@ -80,9 +82,27 @@ export async function POST(req: NextRequest) {
         ${input.referer ?? null}, ${userAgent}, ${ip})
     `;
 
+    await notifyNewLead(toLeadInfo(input, userId));
+
     return jsonOk({ stored: true, userId, mode: "db" as const });
   } catch (err) {
     console.error("[lead:db_error]", err);
     return jsonErr(500, "db_error", "Не вдалося зберегти заявку");
   }
+}
+
+function toLeadInfo(
+  input: z.infer<typeof leadInputSchema>,
+  userId: string | null
+): NewLeadInfo {
+  return {
+    userId,
+    name: input.name,
+    email: input.email,
+    telegram: input.telegram,
+    productSlug: input.productSlug,
+    locale: input.locale ?? "uk",
+    utm: input.utm,
+    referer: input.referer,
+  };
 }
