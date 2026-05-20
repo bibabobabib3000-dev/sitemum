@@ -25,6 +25,11 @@ export const leadInputSchema = z.object({
   locale: z.enum(["uk", "ru"]).optional(),
   referer: z.string().max(2048).optional(),
   utm: utmSchema,
+  /**
+   * Optional Meta Pixel dedup key. The browser-side fbq('track','Lead', ...)
+   * call uses the same value so Meta can deduplicate the two-leg event.
+   */
+  eventId: z.string().min(1).max(64).optional(),
 });
 
 export type LeadInput = z.infer<typeof leadInputSchema>;

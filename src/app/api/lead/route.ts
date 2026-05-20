@@ -4,6 +4,8 @@ import { getDb, isDbConfigured } from "@/lib/db";
 import { jsonErr, jsonOk } from "@/lib/api-response";
 import { leadInputSchema } from "@/lib/validation/schemas";
 import { notifyNewLead, type NewLeadInfo } from "@/lib/telegram/notify";
+import { sendCapiEvent } from "@/lib/analytics/capi";
+import { isCapiConfigured } from "@/lib/analytics/pixel";
 
 export const runtime = "edge";
 
@@ -11,6 +13,11 @@ function clientIp(req: NextRequest): string | null {
   const xff = req.headers.get("x-forwarded-for");
   if (xff) return xff.split(",")[0]!.trim();
   return req.headers.get("x-real-ip");
+}
+
+function readCookie(req: NextRequest, name: string): string | undefined {
+  const c = req.cookies.get(name)?.value;
+  return c && c.length > 0 ? c : undefined;
 }
 
 export async function POST(req: NextRequest) {
@@ -34,6 +41,8 @@ export async function POST(req: NextRequest) {
   const input = parsed.data;
   const ip = clientIp(req);
   const userAgent = req.headers.get("user-agent");
+  const fbp = readCookie(req, "_fbp");
+  const fbc = readCookie(req, "_fbc");
 
   if (!isDbConfigured()) {
     console.log("[lead:stub]", {
@@ -43,7 +52,13 @@ export async function POST(req: NextRequest) {
       note: "DATABASE_URL not set — captured to stdout only",
     });
     await notifyNewLead(toLeadInfo(input, null));
-    return jsonOk({ stored: false, userId: null, mode: "stub" as const });
+    await maybeSendLeadCapi(input, { ip, userAgent, fbp, fbc });
+    return jsonOk({
+      stored: false,
+      userId: null,
+      mode: "stub" as const,
+      capiSent: isCapiConfigured() && Boolean(input.eventId),
+    });
   }
 
   const sql = getDb()!;
@@ -83,8 +98,14 @@ export async function POST(req: NextRequest) {
     `;
 
     await notifyNewLead(toLeadInfo(input, userId));
+    await maybeSendLeadCapi(input, { ip, userAgent, fbp, fbc });
 
-    return jsonOk({ stored: true, userId, mode: "db" as const });
+    return jsonOk({
+      stored: true,
+      userId,
+      mode: "db" as const,
+      capiSent: isCapiConfigured() && Boolean(input.eventId),
+    });
   } catch (err) {
     console.error("[lead:db_error]", err);
     return jsonErr(500, "db_error", "Не вдалося зберегти заявку");
@@ -105,4 +126,31 @@ function toLeadInfo(
     utm: input.utm,
     referer: input.referer,
   };
+}
+
+async function maybeSendLeadCapi(
+  input: z.infer<typeof leadInputSchema>,
+  ctx: {
+    ip: string | null;
+    userAgent: string | null;
+    fbp?: string;
+    fbc?: string;
+  }
+): Promise<void> {
+  if (!input.eventId) return;
+  if (!isCapiConfigured()) return;
+  try {
+    await sendCapiEvent({
+      eventName: "Lead",
+      eventId: input.eventId,
+      eventSourceUrl: input.referer,
+      email: input.email,
+      fbp: ctx.fbp,
+      fbc: ctx.fbc,
+      clientIp: ctx.ip ?? undefined,
+      clientUserAgent: ctx.userAgent ?? undefined,
+    });
+  } catch (err) {
+    console.warn("[lead:capi_error]", err);
+  }
 }

@@ -6,6 +6,26 @@ import { Container } from "@/components/ui/container";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
+type FbqFn = (
+  command: "track" | "trackCustom",
+  eventName: string,
+  params?: Record<string, unknown>,
+  options?: { eventID?: string }
+) => void;
+
+declare global {
+  interface Window {
+    fbq?: FbqFn;
+  }
+}
+
+function newEventId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `lead_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
 type UtmKeys = "source" | "medium" | "campaign" | "content" | "term";
 
 function readUtm(): Partial<Record<UtmKeys, string>> {
@@ -44,6 +64,7 @@ export function LeadForm() {
     setErrorMsg(null);
 
     const data = new FormData(e.currentTarget);
+    const eventId = newEventId();
     const payload = {
       name: String(data.get("name") ?? ""),
       email: String(data.get("email") ?? ""),
@@ -53,7 +74,21 @@ export function LeadForm() {
       referer:
         typeof document !== "undefined" ? document.referrer || undefined : undefined,
       utm: readUtm(),
+      eventId,
     };
+
+    if (typeof window !== "undefined" && typeof window.fbq === "function") {
+      try {
+        window.fbq(
+          "track",
+          "Lead",
+          { content_name: payload.productSlug },
+          { eventID: eventId }
+        );
+      } catch (err) {
+        console.warn("[pixel:lead_track_failed]", err);
+      }
+    }
 
     try {
       const res = await fetch("/api/lead", {
