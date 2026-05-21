@@ -36,8 +36,18 @@ describe("notifyCaseDecision (no transports configured)", () => {
 
 describe("notifyCaseDecision (Resend + Telegram available)", () => {
   it("dispatches email and DM with locale-appropriate subject", async () => {
-    const emailMock = vi.fn(async () => ({ ok: true, id: "abc" }));
-    const sendMessageMock = vi.fn(async () => ({ ok: true, result: undefined }));
+    const emailMock = vi.fn(
+      async (_opts: { to: string; subject: string; html: string; text?: string }) => ({
+        ok: true as const,
+        id: "abc",
+      }),
+    );
+    const sendMessageMock = vi.fn(
+      async (_params: { chat_id: number | string; text: string }) => ({
+        ok: true as const,
+        result: undefined,
+      }),
+    );
     const sqlMock = (strings: TemplateStringsArray) => {
       const text = strings.join("?");
       expect(text).toContain("select tg_chat_id from tg_users");
@@ -69,15 +79,15 @@ describe("notifyCaseDecision (Resend + Telegram available)", () => {
     expect(r.email.sent).toBe(true);
     expect(r.telegram.sent).toBe(true);
     expect(emailMock).toHaveBeenCalledTimes(1);
-    const emailArg = emailMock.mock.calls[0][0];
-    expect(emailArg.to).toBe("a@b.com");
-    expect(emailArg.subject).toMatch(/потрібні правки/);
-    expect(emailArg.html).toContain("Add more detail.");
+    const emailArg = emailMock.mock.calls[0]?.[0];
+    expect(emailArg?.to).toBe("a@b.com");
+    expect(emailArg?.subject ?? "").toMatch(/потрібні правки/);
+    expect(emailArg?.html ?? "").toContain("Add more detail.");
     expect(sendMessageMock).toHaveBeenCalledTimes(1);
-    const tgArg = sendMessageMock.mock.calls[0][0];
-    expect(tgArg.chat_id).toBe(99);
-    expect(tgArg.text).toContain("Alice");
-    expect(tgArg.text).toContain("Add more detail.");
+    const tgArg = sendMessageMock.mock.calls[0]?.[0];
+    expect(tgArg?.chat_id).toBe(99);
+    expect(tgArg?.text ?? "").toContain("Alice");
+    expect(tgArg?.text ?? "").toContain("Add more detail.");
   });
 
   it("skips Telegram when student has no DM chat on file", async () => {
