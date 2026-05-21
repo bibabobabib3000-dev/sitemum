@@ -680,6 +680,96 @@
         "errorGeneric": "Не вдалося зберегти рішення. Спробуй ще раз.",
         "alreadyApproved": "Уже approved — повторний approve пише новий запис в audit-лог."
       }
+    },
+    "users": {
+      "metaTitle": "Адмін · Користувачі — RESOUL",
+      "eyebrow": "Користувачі",
+      "title": "Всі облікові записи",
+      "description": "Пошук за email/імʼям, фільтри по доступу і локалі. Звідси видаєш L0/L1/L2 без SQL, баниш і входиш як юзер для саппорту.",
+      "noName": "Без імені",
+      "searchPlaceholder": "Email, імʼя або @tg…",
+      "col": {
+        "user": "Юзер",
+        "locale": "Локаль",
+        "access": "Доступ",
+        "paid": "Сплачено",
+        "utm": "UTM",
+        "lastSeen": "Останній візит",
+        "status": "Статус"
+      },
+      "status": {
+        "admin": "Admin",
+        "user": "Юзер",
+        "banned": "Banned"
+      },
+      "actions": {
+        "open": "Відкрити",
+        "heading": "Адмін-дії",
+        "accessHeading": "Доступ",
+        "grant": "Видати",
+        "revoke": "Зняти",
+        "banHeading": "Бан",
+        "ban": "Забанити",
+        "unban": "Розбанити",
+        "impersonateHeading": "Impersonate",
+        "impersonate": "Увійти як цей юзер",
+        "impersonateDisabledSelf": "Не можна impersonate себе.",
+        "impersonateDisabledAdmin": "Не можна impersonate іншого адміна.",
+        "busy": "…",
+        "successGrant": "Готово — доступ видано.",
+        "successRevoke": "Готово — доступ знято.",
+        "successBan": "Готово — юзера заблоковано.",
+        "successUnban": "Готово — юзера розблоковано.",
+        "error": "Не вдалося виконати дію. Спробуй ще раз."
+      },
+      "filters": {
+        "access": "Фільтр по доступу",
+        "accessAny": "Будь-який доступ",
+        "accessNone": "Без доступу",
+        "locale": "Фільтр по локалі",
+        "localeAny": "Будь-яка локаль",
+        "apply": "Застосувати"
+      },
+      "empty": {
+        "title": "Нічого не знайдено",
+        "description": "Жоден юзер не підходить під фільтри. Спробуй очистити пошук або вибрати інший доступ."
+      },
+      "pagination": {
+        "prev": "Попередня",
+        "next": "Наступна",
+        "label": "Сторінка {page} з {total}"
+      },
+      "detail": {
+        "metaTitle": "Адмін · Профіль користувача — RESOUL",
+        "eyebrow": "Профіль",
+        "backToList": "До списку",
+        "identityHeading": "Identity",
+        "accessHeading": "Активний доступ",
+        "accessEmpty": "Зараз без жодного активного доступу.",
+        "grantedAt": "видано",
+        "paymentsHeading": "Платежі",
+        "paymentsEmpty": "Платежів немає.",
+        "leadsHeading": "Журнал лідів",
+        "leadsEmpty": "Лідів не зафіксовано.",
+        "caseHeading": "Кейс Level 2",
+        "caseOpen": "Відкрити в Cases",
+        "caseSubmittedAt": "Подано",
+        "meta": {
+          "email": "Email",
+          "fullName": "Імʼя",
+          "tg": "Telegram",
+          "locale": "Локаль",
+          "utm": "UTM source",
+          "createdAt": "Створено",
+          "lastSeenAt": "Останній візит",
+          "role": "Роль",
+          "banned": "Banned at"
+        }
+      }
+    },
+    "impersonate": {
+      "banner": "Ти зараз як",
+      "exit": "Вийти з impersonate"
     }
   }
 }

@@ -44,7 +44,7 @@ export default async function AdminLayout({
   const items: AdminSidebarItem[] = [
     { href: "/admin", label: t("nav.overview") },
     { href: "/admin/cases", label: t("nav.cases") },
-    { href: "/admin/users", label: t("nav.users"), pending: true },
+    { href: "/admin/users", label: t("nav.users") },
     { href: "/admin/leads", label: t("nav.leads"), pending: true },
     { href: "/admin/payments", label: t("nav.payments"), pending: true },
     { href: "/admin/content", label: t("nav.content"), pending: true },
