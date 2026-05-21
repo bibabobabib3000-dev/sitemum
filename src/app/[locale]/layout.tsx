@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { routing } from "@/i18n/routing";
 import { PixelScript } from "@/components/analytics/pixel-script";
 import { RegisterSW } from "@/components/pwa/register-sw";
+import { ImpersonateBanner } from "@/components/admin/impersonate-banner";
 
 const inter = Inter({
   subsets: ["latin", "cyrillic"],
@@ -79,7 +80,10 @@ export default async function LocaleLayout({
   return (
     <html lang={locale} className={`${inter.variable} ${instrumentSerif.variable}`}>
       <body className="font-sans antialiased min-h-screen bg-background text-foreground">
-        <NextIntlClientProvider>{children}</NextIntlClientProvider>
+        <NextIntlClientProvider>
+          <ImpersonateBanner locale={locale === "ru" ? "ru" : "uk"} />
+          {children}
+        </NextIntlClientProvider>
         <PixelScript />
         <RegisterSW />
       </body>

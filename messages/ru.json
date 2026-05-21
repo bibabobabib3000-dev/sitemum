@@ -680,6 +680,96 @@
         "errorGeneric": "Не удалось сохранить решение. Попробуй ещё раз.",
         "alreadyApproved": "Уже approved — повторный approve пишет новую запись в audit-лог."
       }
+    },
+    "users": {
+      "metaTitle": "Админ · Пользователи — RESOUL",
+      "eyebrow": "Пользователи",
+      "title": "Все учётные записи",
+      "description": "Поиск по email/имени, фильтры по доступу и локали. Отсюда выдаёшь L0/L1/L2 без SQL, банишь и входишь как юзер для саппорта.",
+      "noName": "Без имени",
+      "searchPlaceholder": "Email, имя или @tg…",
+      "col": {
+        "user": "Юзер",
+        "locale": "Локаль",
+        "access": "Доступ",
+        "paid": "Оплачено",
+        "utm": "UTM",
+        "lastSeen": "Последний визит",
+        "status": "Статус"
+      },
+      "status": {
+        "admin": "Admin",
+        "user": "Юзер",
+        "banned": "Banned"
+      },
+      "actions": {
+        "open": "Открыть",
+        "heading": "Админ-действия",
+        "accessHeading": "Доступ",
+        "grant": "Выдать",
+        "revoke": "Снять",
+        "banHeading": "Бан",
+        "ban": "Забанить",
+        "unban": "Разбанить",
+        "impersonateHeading": "Impersonate",
+        "impersonate": "Войти как этот юзер",
+        "impersonateDisabledSelf": "Нельзя impersonate себя.",
+        "impersonateDisabledAdmin": "Нельзя impersonate другого админа.",
+        "busy": "…",
+        "successGrant": "Готово — доступ выдан.",
+        "successRevoke": "Готово — доступ снят.",
+        "successBan": "Готово — юзер заблокирован.",
+        "successUnban": "Готово — юзер разблокирован.",
+        "error": "Не удалось выполнить действие. Попробуй ещё раз."
+      },
+      "filters": {
+        "access": "Фильтр по доступу",
+        "accessAny": "Любой доступ",
+        "accessNone": "Без доступа",
+        "locale": "Фильтр по локали",
+        "localeAny": "Любая локаль",
+        "apply": "Применить"
+      },
+      "empty": {
+        "title": "Ничего не найдено",
+        "description": "Ни один юзер не подходит под фильтры. Попробуй очистить поиск или выбрать другой доступ."
+      },
+      "pagination": {
+        "prev": "Предыдущая",
+        "next": "Следующая",
+        "label": "Страница {page} из {total}"
+      },
+      "detail": {
+        "metaTitle": "Админ · Профиль пользователя — RESOUL",
+        "eyebrow": "Профиль",
+        "backToList": "К списку",
+        "identityHeading": "Identity",
+        "accessHeading": "Активный доступ",
+        "accessEmpty": "Сейчас без активного доступа.",
+        "grantedAt": "выдан",
+        "paymentsHeading": "Платежи",
+        "paymentsEmpty": "Платежей нет.",
+        "leadsHeading": "Журнал лидов",
+        "leadsEmpty": "Лидов не зафиксировано.",
+        "caseHeading": "Кейс Level 2",
+        "caseOpen": "Открыть в Cases",
+        "caseSubmittedAt": "Подано",
+        "meta": {
+          "email": "Email",
+          "fullName": "Имя",
+          "tg": "Telegram",
+          "locale": "Локаль",
+          "utm": "UTM source",
+          "createdAt": "Создан",
+          "lastSeenAt": "Последний визит",
+          "role": "Роль",
+          "banned": "Banned at"
+        }
+      }
+    },
+    "impersonate": {
+      "banner": "Ты сейчас как",
+      "exit": "Выйти из impersonate"
     }
   }
 }
