@@ -608,6 +608,78 @@
         "webhookErrors7d": "Ошибки webhook · 7д",
         "webhookErrors7dHint": "Подключится в PR E2 (Sentry + /api/admin/metrics)."
       }
+    },
+    "cases": {
+      "metaTitle": "Админ · Кейсы Level 2 — RESOUL",
+      "eyebrow": "Кейсы",
+      "title": "Обзор кейсов Level 2",
+      "description": "Каждый студент сдаёт одну финальную работу. Approve → кандидату автоматически открывается сертификат L2. Reject → студент видит твой комментарий и присылает правки.",
+      "noName": "Без имени",
+      "searchPlaceholder": "Email или имя…",
+      "filter": {
+        "pending": "В очереди",
+        "approved": "Approved",
+        "all": "Все"
+      },
+      "col": {
+        "user": "Студент",
+        "submittedAt": "Подано",
+        "preview": "Первый абзац",
+        "video": "Видео",
+        "status": "Статус"
+      },
+      "video": {
+        "yes": "Да"
+      },
+      "status": {
+        "pending": "Pending",
+        "approved": "Approved"
+      },
+      "actions": {
+        "review": "Открыть"
+      },
+      "empty": {
+        "title": "Здесь пока пусто",
+        "description": "По текущим фильтрам нет ни одного кейса. Поменяй статус или очисти поиск."
+      },
+      "pagination": {
+        "prev": "Назад",
+        "next": "Вперёд",
+        "label": "Страница {page} из {total}"
+      },
+      "detail": {
+        "metaTitle": "Админ · Кейс L2 — RESOUL",
+        "eyebrow": "Кейс · Level 2",
+        "backToQueue": "К очереди",
+        "bodyHeading": "Тело кейса",
+        "videoHeading": "Видео",
+        "noVideo": "Видео не приложено.",
+        "metaHeading": "Метаданные",
+        "meta": {
+          "submittedAt": "Подано",
+          "locale": "Локаль",
+          "tg": "Telegram",
+          "status": "Статус",
+          "approvedAt": "Approved в",
+          "reviewer": "Reviewer"
+        }
+      },
+      "form": {
+        "notesLabel": "Приватный комментарий (UA)",
+        "notesPlaceholder": "Что скажешь студенту? Этот текст уйдёт в email + Telegram.",
+        "notesHelp": "До 4000 символов. Виден только админам в audit-логе.",
+        "approve": "Approve",
+        "reject": "Reject",
+        "submitting": "Отправляю…",
+        "emailDelivered": "Email доставлен",
+        "emailFailed": "Email не отправлен",
+        "tgDelivered": "Telegram DM доставлен",
+        "tgFailed": "Telegram DM не отправлен",
+        "successApprove": "Готово — кейс approved, сертификат L2 открыт.",
+        "successReject": "Готово — кейс reject, студент видит твой комментарий.",
+        "errorGeneric": "Не удалось сохранить решение. Попробуй ещё раз.",
+        "alreadyApproved": "Уже approved — повторный approve пишет новую запись в audit-лог."
+      }
     }
   }
 }

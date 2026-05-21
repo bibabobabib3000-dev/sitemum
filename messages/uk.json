@@ -608,6 +608,78 @@
         "webhookErrors7d": "Помилки webhook · 7д",
         "webhookErrors7dHint": "Підключиться у PR E2 (Sentry + /api/admin/metrics)."
       }
+    },
+    "cases": {
+      "metaTitle": "Адмін · Кейси Level 2 — RESOUL",
+      "eyebrow": "Кейси",
+      "title": "Огляд кейсів Level 2",
+      "description": "Кожен студент здає одну фінальну роботу. Approve → канditatу автоматично надається сертифікат L2. Reject → студент бачить твій коментар і подає правки.",
+      "noName": "Без імені",
+      "searchPlaceholder": "Email або імʼя…",
+      "filter": {
+        "pending": "В черзі",
+        "approved": "Approved",
+        "all": "Усі"
+      },
+      "col": {
+        "user": "Студент",
+        "submittedAt": "Подано",
+        "preview": "Перший абзац",
+        "video": "Відео",
+        "status": "Статус"
+      },
+      "video": {
+        "yes": "Так"
+      },
+      "status": {
+        "pending": "Pending",
+        "approved": "Approved"
+      },
+      "actions": {
+        "review": "Переглянути"
+      },
+      "empty": {
+        "title": "Тут поки нічого",
+        "description": "За поточними фільтрами немає жодного кейсу. Спробуй змінити статус або очистити пошук."
+      },
+      "pagination": {
+        "prev": "Попередня",
+        "next": "Наступна",
+        "label": "Сторінка {page} з {total}"
+      },
+      "detail": {
+        "metaTitle": "Адмін · Кейс L2 — RESOUL",
+        "eyebrow": "Кейс · Level 2",
+        "backToQueue": "До черги",
+        "bodyHeading": "Тіло кейсу",
+        "videoHeading": "Відео",
+        "noVideo": "Відео не додано.",
+        "metaHeading": "Метадані",
+        "meta": {
+          "submittedAt": "Подано",
+          "locale": "Локаль",
+          "tg": "Telegram",
+          "status": "Статус",
+          "approvedAt": "Approved о",
+          "reviewer": "Reviewer"
+        }
+      },
+      "form": {
+        "notesLabel": "Приватний коментар (UA)",
+        "notesPlaceholder": "Що скажеш студенту? Цей текст піде в email + Telegram.",
+        "notesHelp": "До 4000 символів. Видимий лише адмінам у audit-логу.",
+        "approve": "Approve",
+        "reject": "Reject",
+        "submitting": "Відправляю…",
+        "emailDelivered": "Email доставлено",
+        "emailFailed": "Email не відправлено",
+        "tgDelivered": "Telegram DM доставлено",
+        "tgFailed": "Telegram DM не відправлено",
+        "successApprove": "Готово — кейс approved, сертифікат L2 відкрито.",
+        "successReject": "Готово — кейс reject, студент бачить твій коментар.",
+        "errorGeneric": "Не вдалося зберегти рішення. Спробуй ще раз.",
+        "alreadyApproved": "Уже approved — повторний approve пише новий запис в audit-лог."
+      }
     }
   }
 }
