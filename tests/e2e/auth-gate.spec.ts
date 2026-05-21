@@ -22,4 +22,18 @@ test.describe("auth gate", () => {
     await page.goto("/uk/dashboard/level-1/case-study");
     await expect(page).toHaveURL(/\/uk\/login/);
   });
+
+  test("redirects unauthenticated users away from /uk/admin", async ({
+    page,
+  }) => {
+    await page.goto("/uk/admin");
+    await expect(page).toHaveURL(/\/uk\/login/);
+  });
+
+  test("redirects unauthenticated users away from /ru/admin", async ({
+    page,
+  }) => {
+    await page.goto("/ru/admin");
+    await expect(page).toHaveURL(/\/ru\/login/);
+  });
 });

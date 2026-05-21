@@ -564,5 +564,50 @@
       "primary": "Зайти в Immersion Week",
       "secondary": "Подивитися програму"
     }
+  },
+  "admin": {
+    "sidebar": {
+      "title": "Адмін-панель",
+      "backToDashboard": "Кабінет",
+      "pendingBadge": "Скоро"
+    },
+    "nav": {
+      "overview": "Огляд",
+      "cases": "Кейси",
+      "users": "Користувачі",
+      "leads": "Ліди",
+      "payments": "Платежі",
+      "content": "Контент",
+      "telegram": "Telegram",
+      "events": "Події",
+      "audit": "Audit log",
+      "settings": "Налаштування"
+    },
+    "overview": {
+      "metaTitle": "Адмін · Огляд — RESOUL",
+      "eyebrow": "Огляд",
+      "title": "Стан платформи",
+      "description": "Зведена картина: ліди, конверсія, гроші сьогодні, активні студенти, кейси на перевірку. Цифри оновлюються раз на хвилину.",
+      "generatedAt": "Оновлено о {time}",
+      "cacheNote": "Дані з прямих SQL-агрегатів, кешуються на 60 секунд. Тиснуть на БД мінімально.",
+      "kpi": {
+        "newLeads24h": "Нові ліди · 24г",
+        "newLeads24hHint": "Унікальні email за останні 24 години.",
+        "conversion30d": "Конверсія · 30д",
+        "conversion30dHint": "Платежі ÷ унікальні ліди за 30 днів.",
+        "paymentsToday": "Платежі сьогодні",
+        "paymentsTodayHint": "Сума успішних транзакцій у UAH від 00:00.",
+        "activeLevel0": "Студенти L0",
+        "activeLevel0Hint": "Унікальні юзери з enrollment у level-0.",
+        "activeLevel1": "Студенти L1",
+        "activeLevel1Hint": "Унікальні юзери з enrollment у level-1.",
+        "activeLevel2": "Студенти L2",
+        "activeLevel2Hint": "Активний доступ до продукту level-2.",
+        "casesPending": "Кейси в перевірці",
+        "casesPendingHint": "Очікують approve або reject від адміна.",
+        "webhookErrors7d": "Помилки webhook · 7д",
+        "webhookErrors7dHint": "Підключиться у PR E2 (Sentry + /api/admin/metrics)."
+      }
+    }
   }
 }
