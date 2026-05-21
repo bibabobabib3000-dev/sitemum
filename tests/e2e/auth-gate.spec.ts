@@ -36,4 +36,11 @@ test.describe("auth gate", () => {
     await page.goto("/ru/admin");
     await expect(page).toHaveURL(/\/ru\/login/);
   });
+
+  test("redirects unauthenticated users away from /uk/admin/cases", async ({
+    page,
+  }) => {
+    await page.goto("/uk/admin/cases");
+    await expect(page).toHaveURL(/\/uk\/login/);
+  });
 });
