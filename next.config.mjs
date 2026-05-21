@@ -7,11 +7,16 @@ const require = createRequire(import.meta.url);
 const withPWA = require("next-pwa")({
   dest: "public",
   disable: process.env.NODE_ENV === "development",
-  register: true,
+  // next-pwa's App-Router register-script injection is broken upstream
+  // (it relies on `pages/_document`); we register /sw.js ourselves from
+  // <RegisterSW /> in the locale layout.
+  register: false,
   skipWaiting: true,
   cleanupOutdatedCaches: true,
   // We never want auth or webhook routes to land in the SW cache.
-  buildExcludes: [/middleware-manifest\.json$/],
+  // app-build-manifest.json is generated for the dev server only and 404s
+  // under `next start`; precaching it would break SW install.
+  buildExcludes: [/middleware-manifest\.json$/, /app-build-manifest\.json$/],
   publicExcludes: ["!noprecache/**/*"],
   runtimeCaching,
 });
