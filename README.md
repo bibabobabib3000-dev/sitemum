@@ -60,6 +60,22 @@ pnpm dev
 - `pnpm build` — production-білд
 - `pnpm start` — запуск production-білда
 - `pnpm lint` — ESLint (`next lint`)
+- `pnpm typecheck` — `tsc --noEmit`
+- `pnpm test` — unit (vitest) + e2e (Playwright)
+- `pnpm test:unit` — лише vitest (`tests/unit/**`)
+- `pnpm test:e2e` — лише Playwright (`tests/e2e/**`); першим запуском треба зробити `pnpm test:e2e:install`
+
+## Тести і CI
+
+- **Unit:** `tests/unit/**` — `vitest` ганяє чисті хелпери з `src/lib/**` (drip-state, roadmap-state, certificate gate). DB замокана, нічого назовні не б'є. Конфіг — `vitest.config.ts`.
+- **e2e:** `tests/e2e/**` — `@playwright/test` піднімає `pnpm build && pnpm start -p 3010` без реального Neon (stub mode) і ганяє smoke-флоу: landing, lead-form у stub-режимі, auth-гейт на `/dashboard`, PWA manifest + `/sw.js`. Конфіг — `playwright.config.ts`.
+- **CI:** `.github/workflows/ci.yml` запускає три паралельних джоби — `lint+typecheck`, `unit`, `e2e` (шардований на 2). Щоб PR не міг злитися без зеленого CI — увімкни branch-protection на `main` і додай ці чеки як required.
+
+```bash
+pnpm test:unit               # фідбек за ~2 секунди
+pnpm test:e2e:install        # одноразово, ставить chromium і системні залежності
+pnpm test:e2e                # ~30 секунд на чистому кеші, без DB
+```
 
 ## Структура
 
