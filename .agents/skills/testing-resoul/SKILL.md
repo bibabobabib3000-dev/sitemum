@@ -1,174 +1,94 @@
 ---
 name: testing-resoul
-description: Test the RESOUL Next.js app end-to-end — lead form, /api/lead stub vs DB modes, Telegram webhook secret guard, and the t.me deep-link CTA. Use when verifying lead-capture or Telegram-related changes.
+description: Test the RESOUL Next.js app end-to-end — auth-gated dashboard pages, PWA service worker + manifest, lead form, and Telegram webhook secret guard. Use when verifying any change to /dashboard/*, /api/case-study/*, /api/lead, the manifest/SW config, or i18n copy for the Cabinet.
 ---
 
 # Testing the RESOUL app
 
-This skill covers smoke-testing the RESOUL Next.js app locally without
-requiring a live Neon DB or a real Telegram bot. The app degrades to safe
-stub paths when those are missing, which makes it convenient to test the
-UI + edge logic in isolation.
+## Stack snapshot
+- Next.js 14 (App Router) + TypeScript + Tailwind + next-intl, pnpm workspace.
+- Postgres via Neon serverless driver (`@neondatabase/serverless`).
+- Stateless cookie auth: `resoul_session = <b64url(payload)>.<b64url(HMAC-SHA256(payload, AUTH_COOKIE_SECRET))>` where `payload = { uid, exp }`. No DB session table — the signature is trusted.
+- next-pwa 5.6.0 wraps `next.config.mjs` and generates `public/sw.js` at build time. The PWA is **disabled when NODE_ENV=development**, so PWA testing must run against a prod build.
 
-## Tech stack quick facts
+## What the env usually does NOT have
+- `DATABASE_URL` (the app degrades to stub mode: all reads return null/empty).
+- `AUTH_COOKIE_SECRET` (without it, `getSession()` always returns null and every `/dashboard/*` route redirects to `/login`).
+- Neon credentials, R2, Telegram bot tokens.
 
-- Next.js 14 App Router, React 18, `next-intl` locale routing (`/uk`, `/ru`).
-- API routes run on edge runtime — no Node-only deps.
-- Package manager: pnpm.
-- DB: Neon serverless (`@neondatabase/serverless`). Optional in dev — when
-  `DATABASE_URL` is unset, `/api/lead` returns `{stored:false, userId:null, mode:"stub"}`.
-- Telegram: plain `fetch` against `https://api.telegram.org/bot<token>/...`.
-  When `TELEGRAM_BOT_TOKEN` is missing/invalid, calls return `ok:false` and
-  are logged but never throw — lead capture is unaffected.
+Decide up front which scenario the test needs:
+- **Public pages / lead form / manifest / SW artefacts**: no setup, just build + start.
+- **Auth-gated dashboard pages without real DB**: set a local `AUTH_COOKIE_SECRET` and forge a cookie (see below). DB-backed branches will degrade to no-access fallbacks, which is enough to prove rendering + i18n + access-gate behaviour.
+- **Full happy paths (real enrollments, case-study submission, certificate approval, R2 video URLs, TG bot)**: requires real credentials; not doable without the user provisioning them.
 
-## Quick start (local dev)
-
-From repo root:
-
+## Standard local setup
 ```bash
-pnpm install
-NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=resoul_test_bot \
-TELEGRAM_BOT_TOKEN=fake-token-for-testing-not-real \
-PORT=3000 pnpm dev
+cd /home/ubuntu/repos/sitemum
+fuser -k 3015/tcp 2>/dev/null            # kill any stale process on the port
+AUTH_COOKIE_SECRET="test-cookie-secret-for-local-only-1234" \
+  NODE_ENV=production PORT=3015 \
+  nohup pnpm start > /tmp/start.log 2>&1 &
+sleep 4 && tail -8 /tmp/start.log
 ```
+If the production bundle is stale, run `pnpm build` first. Use port 3015 to avoid clashing with the default 3000 that other dev servers grab.
 
-Then open `http://localhost:3000/uk` or `/ru`.
-
-Lint + build (no CI configured in this repo as of PR #3):
-
+### Forging a session cookie
 ```bash
-pnpm lint
-pnpm build
+node -e '
+const { createHmac } = require("crypto");
+const secret = "test-cookie-secret-for-local-only-1234";
+const payload = { uid: "00000000-0000-0000-0000-000000000001", exp: Math.floor(Date.now()/1000) + 3600 };
+const json = JSON.stringify(payload);
+const b64 = (buf) => Buffer.from(buf).toString("base64").replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+const body = b64(json);
+const sig = b64(createHmac("sha256", secret).update(body).digest());
+console.log(body + "." + sig);
+' > /tmp/cookie.txt
+COOKIE=$(cat /tmp/cookie.txt)
+curl -sS -b "resoul_session=$COOKIE" http://localhost:3015/uk/dashboard
 ```
+In the browser, set the cookie via DevTools Console with `document.cookie='resoul_session=...; path=/'` — even though the server sets the cookie httpOnly, the cookie spec allows a same-name JS cookie to coexist and be sent to the server.
 
-## How features are reachable from the UI
-
-- Landing pages: `/uk`, `/ru`. The CTA "Зайти в Immersion Week" jumps to the
-  in-page form (`#form`).
-- Lead form: `src/components/sections/lead-form.tsx`. On success the form is
-  replaced **in place** by a success card — there is no redirect.
-- Standalone thank-you page: `/uk/event/thank-you` and `/ru/event/thank-you`,
-  reachable directly. Accepts an optional `?u=<uuid>` to seed the deep link.
-- The Telegram CTA on both success card and thank-you is **only rendered**
-  when `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` is non-empty. If it is empty the
-  button is intentionally hidden.
-
-## Telegram webhook secret guard
-
-`POST /api/telegram/webhook` checks `X-Telegram-Bot-Api-Secret-Token` against
-`TELEGRAM_WEBHOOK_SECRET`:
-
-- If env unset → all requests pass (dev convenience).
-- If env set → bad/missing header returns `403 forbidden`.
-- If env set and header matches → `200 {"ok":true}`.
-
-When you set the secret, restart the dev server (env is read at boot).
-
-`GET /api/telegram/webhook` is a no-auth liveness probe that returns
-`{"ok":true,"service":"telegram-webhook"}`.
-
-## Adversarial shell checks (copy-paste)
-
+## Quick smoke (probes everything from the shell)
 ```bash
-# Liveness
-curl -sS http://localhost:3000/api/telegram/webhook
-
-# /start payload — links lead to chat_id (stub mode: no DB row, logs in console)
-curl -sS -X POST http://localhost:3000/api/telegram/webhook \
-  -H 'Content-Type: application/json' \
-  -d '{"update_id":1,"message":{"message_id":1,"date":1,"chat":{"id":42,"type":"private"},"from":{"id":42,"is_bot":false,"first_name":"T","language_code":"uk"},"text":"/start lead_11111111-2222-3333-4444-555555555555"}}'
-
-# Lead API stub mode
-curl -sS -X POST http://localhost:3000/api/lead \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Adv","email":"adv@example.com","telegram":"@adv_test","productSlug":"level-0","locale":"uk"}'
-# → {"ok":true,"data":{"stored":false,"userId":null,"mode":"stub"}}
-
-# Lead API validation regression — empty name, bad email, invalid telegram
-curl -sS -o /dev/null -w '%{http_code}\n' -X POST http://localhost:3000/api/lead \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"","email":"not-an-email","telegram":"@x"}'
-# → 422
+for p in /uk /manifest.webmanifest /sw.js /uk/dashboard /uk/dashboard/roadmap /uk/dashboard/level-1/case-study; do
+  printf "%-45s " "$p"
+  curl -sS -o /dev/null -w "HTTP %{http_code}  redirect: %{redirect_url}\n" "http://localhost:3015$p"
+done
 ```
+Expected without session cookie: all three `/uk/dashboard*` paths return **307** to `/uk/login`; the rest return **200**.
 
-To verify the secret guard, restart dev with `TELEGRAM_WEBHOOK_SECRET=secret123` and:
-
+## Verifying the SW build artefact
 ```bash
-# Bad header → 403
-curl -sS -o /dev/null -w '%{http_code}\n' -X POST \
-  http://localhost:3000/api/telegram/webhook \
-  -H 'X-Telegram-Bot-Api-Secret-Token: WRONG' \
-  -H 'Content-Type: application/json' \
-  -d '{"update_id":1,"message":{"message_id":1,"date":1,"chat":{"id":42,"type":"private"},"from":{"id":42,"is_bot":false,"first_name":"T"},"text":"/start"}}'
-# → 403
-
-# Good header → 200
-curl -sS -X POST http://localhost:3000/api/telegram/webhook \
-  -H 'X-Telegram-Bot-Api-Secret-Token: secret123' \
-  -H 'Content-Type: application/json' \
-  -d '{"update_id":1,"message":{"message_id":1,"date":1,"chat":{"id":42,"type":"private"},"from":{"id":42,"is_bot":false,"first_name":"T"},"text":"/start"}}'
-# → {"ok":true}
+curl -sS http://localhost:3015/sw.js | \
+  grep -oE "resoul-(lesson-media|fonts|pages|images)|google-fonts-(webfonts|stylesheets)" | sort -u
 ```
+Should list all six cache buckets (`resoul-lesson-media`, `resoul-fonts`, `resoul-pages`, `resoul-images`, `google-fonts-webfonts`, `google-fonts-stylesheets`).
 
-## Browser flow to verify the deep-link CTA
+### Known gotcha — next-pwa 5.6 + App Router
+`next-pwa@5.6.0` with `register: true` injects its registration script via the legacy `pages/_document`. Because this project uses the App Router only, the register script is **never** emitted into the HTML, so `/sw.js` does not auto-register in the browser even though the file exists. Symptoms:
+- DevTools → Application → Service Workers is empty after a hard reload.
+- `grep -o serviceWorker http://localhost:3015/uk` returns nothing in the HTML.
 
-1. Open `http://localhost:3000/uk`, scroll to form (`#form`).
-2. Fill in name, email, `@username`-style telegram, click `Продовжити`.
-3. Inline success card should appear with the Telegram-bot button.
-4. Inspect the button's `href`:
-   - Stub mode (no `DATABASE_URL`) → `https://t.me/<bot>` (userId is null).
-   - DB mode → `https://t.me/<bot>?start=lead_<uuid>`.
-5. Also open `/uk/event/thank-you?u=<uuid>` — href should always include
-   `?start=lead_<uuid>` when `?u=` is present.
-6. Switch to `/ru/event/thank-you` (no `?u=`) — heading should be `Спасибо!`,
-   CTA `Открыть Telegram-бота`, link has no `?start=` segment.
+Workaround when testing locally: open DevTools console and run `navigator.serviceWorker.register('/sw.js')`. Note that workbox may also throw `bad-precaching-response` on `/_next/app-build-manifest.json` (404 from `next start`) — that path needs to be added to `buildExcludes` in `next.config.mjs` for the SW to actually install. Real fix is a small client component that calls `register('/sw.js')` from inside `src/app/[locale]/layout.tsx`.
 
-## Gotchas / things that might be broken in future
+## Case-study + L2 cert gate (PR #12 area)
+- Page: `/uk/dashboard/level-1/case-study` (and the same under `/ru/...`).
+- Without L2 access, the page shows an eyebrow `Сертифікація Level 2`, h1 `Твій кейс`, a no-access body and a `До програми` CTA pointing to `/uk/platform`. The form/textarea must NOT render.
+- With L2 access, the form renders with a live char counter (200..20000) and posts to `POST /api/case-study/submit` (edge runtime, zod-validated, idempotent upsert into `cases`).
+- Admin approval is manual SQL for now: `UPDATE cases SET approved=true, approved_at=now() WHERE user_id='<uid>';`. There is no admin UI yet.
+- `/uk/dashboard` shows a `TileCertificate` plaque ONLY for users with L2 access; the plaque CTA links to the case-study page.
 
-- **Bot identity**: a token from `@BotFather` is *not* tied to your project name.
-  When testing live, always run `getMe` first and confirm the bot's `username`
-  matches what you put in `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME`. During PR #3
-  testing, the supplied token resolved to `@BNBCasino_bot` — clearly not the
-  intended RESOUL bot. If a similar mismatch surfaces, the workaround is to
-  create a fresh bot via `@BotFather` and update env vars.
-- **Webhook secret behavior is asymmetric**: an unset secret means the route
-  is open. Don't deploy without setting it; tests should explicitly verify
-  both modes.
-- **Edge runtime**: any Node-only library imported into `src/app/api/**`
-  will break the build. If you need to add a TG SDK, prefer plain `fetch`.
-- **next-intl + Edge cache warning**: `pnpm dev` and `pnpm build` may print
-  `[webpack.cache.PackFileCacheStrategy] Parsing of .../next-intl/.../format/index.js for build dependencies failed at 'import(t)'`.
-  This is a known next-intl cache hint, not a build failure — ignore.
-- **No CI yet**: as of PR #3 the repo has no GitHub Actions. Don't wait for
-  `git_pr_checks` indefinitely; `wait_mode="none"` returns immediately.
+## Roadmap (PR #10 area)
+- Page: `/uk/dashboard/roadmap`. Renders three milestones L0/L1/L2 in horizontal timeline with states `locked / active / done`.
+- Without DB, all three render as `Закритий`. This is the correct "no data" rendering, not a bug.
 
-## DB-mode testing (when a Neon URL is available)
+## i18n contract
+- All copy lives in `messages/uk.json` and `messages/ru.json`. If a test sees a raw key like `dashboard.caseStudy.noAccess.body` rendered in the DOM, the i18n entry is missing — that's a real bug, not a fallback.
 
-If you have a `DATABASE_URL`:
-
-```bash
-psql "$DATABASE_URL" -f migrations/0001_init.sql
-psql "$DATABASE_URL" -f migrations/0002_tg_users.sql
-```
-
-Then restart dev with `DATABASE_URL` exported. `/api/lead` will switch to
-`mode:"db"` and return a real `userId`. The Telegram webhook will upsert
-`tg_users` and link `users.tg_id`.
-
-Useful inspection queries:
-
-```sql
-select id, name, email, tg_username, tg_id from users order by created_at desc limit 5;
-select tg_chat_id, tg_username, user_id, start_payload from tg_users order by updated_at desc limit 5;
-```
-
-## Devin secrets needed
-
-- `TELEGRAM_BOT_TOKEN` — only needed for live Telegram tests. For local
-  smoke-testing use a bogus value to exercise graceful-degradation paths.
-- `TELEGRAM_WEBHOOK_SECRET` — needed only when testing the secret-guarded
-  path; not required for plain UI testing.
-- `DATABASE_URL` (Neon) — needed only when testing the DB-write path of
-  `/api/lead` and the webhook upserts. Stub mode does not require it.
-- `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` — not a real secret, but the deep-link
-  CTA is hidden when empty, so set it (e.g. `resoul_test_bot`) for UI tests.
+## Devin secrets needed (for full E2E)
+Not used in stub-mode testing, but required for full happy paths:
+- `DATABASE_URL` — Neon Postgres connection string.
+- `AUTH_COOKIE_SECRET` — HMAC secret (≥16 chars). For local stub testing any string works.
+- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_ADMIN_CHAT_ID`, `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` — required for the lead-funnel + bot webhook flow.
+- `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` — required for `/api/lessons/*/sign` presigned URLs.
