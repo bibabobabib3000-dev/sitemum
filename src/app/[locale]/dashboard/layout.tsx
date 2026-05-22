@@ -1,12 +1,13 @@
 import { redirect } from "@/i18n/navigation";
 import { setRequestLocale, getTranslations } from "next-intl/server";
 import { getSession } from "@/lib/auth/session";
+import { isSessionBanned } from "@/lib/auth/user";
 import { SiteNav } from "@/components/sections/nav";
 import { Footer } from "@/components/sections/footer";
 import { Container } from "@/components/ui/container";
 import { Link } from "@/i18n/navigation";
 
-// Cookie-gated: must run on every request.
+// Cookie-gated + ban-gated: must run on every request.
 export const dynamic = "force-dynamic";
 
 export default async function DashboardLayout({
@@ -22,6 +23,13 @@ export default async function DashboardLayout({
   const session = await getSession();
   if (!session) {
     redirect({ href: "/login", locale });
+  }
+
+  // Ban gate: a session whose user got banned mid-session is bounced to
+  // a dedicated explainer page. We do NOT silently log them out — the
+  // user needs to know why they lost access.
+  if (await isSessionBanned()) {
+    redirect({ href: "/banned", locale });
   }
 
   const t = await getTranslations({ locale, namespace: "dashboard.nav" });
@@ -49,6 +57,12 @@ export default async function DashboardLayout({
               className="text-foreground/60 transition-colors hover:text-foreground"
             >
               {t("states")}
+            </Link>
+            <Link
+              href="/account"
+              className="text-foreground/60 transition-colors hover:text-foreground"
+            >
+              {t("account")}
             </Link>
             <form
               action="/api/auth/logout"
