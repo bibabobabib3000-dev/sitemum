@@ -59,6 +59,18 @@ export default async function DashboardLayout({
               {t("states")}
             </Link>
             <Link
+              href="/dashboard/notes"
+              className="text-foreground/60 transition-colors hover:text-foreground"
+            >
+              {t("notes")}
+            </Link>
+            <Link
+              href="/dashboard/bookmarks"
+              className="text-foreground/60 transition-colors hover:text-foreground"
+            >
+              {t("bookmarks")}
+            </Link>
+            <Link
               href="/account"
               className="text-foreground/60 transition-colors hover:text-foreground"
             >

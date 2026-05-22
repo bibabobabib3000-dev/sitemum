@@ -71,4 +71,18 @@ test.describe("auth gate", () => {
     await page.goto("/uk/banned");
     await expect(page).toHaveURL(/\/uk\/login/);
   });
+
+  test("redirects unauthenticated users away from /uk/dashboard/notes", async ({
+    page,
+  }) => {
+    await page.goto("/uk/dashboard/notes");
+    await expect(page).toHaveURL(/\/uk\/login/);
+  });
+
+  test("redirects unauthenticated users away from /uk/dashboard/bookmarks", async ({
+    page,
+  }) => {
+    await page.goto("/uk/dashboard/bookmarks");
+    await expect(page).toHaveURL(/\/uk\/login/);
+  });
 });
