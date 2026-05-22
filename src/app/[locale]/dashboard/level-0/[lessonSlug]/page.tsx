@@ -14,6 +14,9 @@ import { r2PublicUrl } from "@/lib/storage/r2";
 import { LessonPlayer } from "@/components/courses/lesson-player";
 import { HomeworkForm } from "@/components/courses/homework-form";
 import { LessonLibrary } from "@/components/courses/library";
+import { LessonNotes } from "@/components/dashboard/lesson-notes";
+import { BookmarkButton } from "@/components/dashboard/bookmark-button";
+import { getNote, isBookmarked } from "@/lib/lessons/notes";
 
 export const dynamic = "force-dynamic";
 
@@ -94,7 +97,11 @@ export default async function LessonPage({
     redirect({ href: "/dashboard/level-0", locale });
   }
 
-  const recent = await listHomework(userId, lesson.id, 3);
+  const [recent, existingNote, bookmarked] = await Promise.all([
+    listHomework(userId, lesson.id, 3),
+    getNote(userId, lesson.id),
+    isBookmarked(userId, lesson.id),
+  ]);
 
   const t = await getTranslations({ locale, namespace: "lesson" });
   const title = locale === "ru" ? lesson.titleRu ?? lesson.titleUk : lesson.titleUk;
@@ -115,10 +122,15 @@ export default async function LessonPage({
       >
         ← {t("backToCourse")}
       </Link>
-      <h1 className="mt-3 font-display text-3xl sm:text-4xl">{title}</h1>
-      <p className="mt-2 text-xs uppercase tracking-widest text-foreground/45">
-        {t("dayBadge", { day: lesson.dayOffset + 1 })}
-      </p>
+      <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display text-3xl sm:text-4xl">{title}</h1>
+          <p className="mt-2 text-xs uppercase tracking-widest text-foreground/45">
+            {t("dayBadge", { day: lesson.dayOffset + 1 })}
+          </p>
+        </div>
+        <BookmarkButton lessonId={lesson.id} initialBookmarked={bookmarked} />
+      </div>
 
       <div className="mt-8">
         <LessonPlayer lessonId={lesson.id} locale={locale} />
@@ -136,6 +148,16 @@ export default async function LessonPage({
           <LessonLibrary assets={assets} locale={locale} />
         </div>
       ) : null}
+
+      <div className="mt-12">
+        <LessonNotes
+          lessonId={lesson.id}
+          initialBody={existingNote?.bodyMd ?? ""}
+          initialUpdatedAt={
+            existingNote ? existingNote.updatedAt.toISOString() : null
+          }
+        />
+      </div>
 
       <div className="mt-12">
         <HomeworkForm
