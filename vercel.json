@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/zoom-reminders",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/outbox-drain",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

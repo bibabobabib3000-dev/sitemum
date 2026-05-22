@@ -2,10 +2,12 @@ import { redirect } from "@/i18n/navigation";
 import { setRequestLocale, getTranslations } from "next-intl/server";
 import { getSession } from "@/lib/auth/session";
 import { isSessionBanned } from "@/lib/auth/user";
+import { countUnread } from "@/lib/notifications/read";
 import { SiteNav } from "@/components/sections/nav";
 import { Footer } from "@/components/sections/footer";
 import { Container } from "@/components/ui/container";
 import { Link } from "@/i18n/navigation";
+import { NotifBell } from "@/components/dashboard/notif-bell";
 
 // Cookie-gated + ban-gated: must run on every request.
 export const dynamic = "force-dynamic";
@@ -33,6 +35,7 @@ export default async function DashboardLayout({
   }
 
   const t = await getTranslations({ locale, namespace: "dashboard.nav" });
+  const unread = session ? await countUnread(session.uid) : 0;
 
   return (
     <>
@@ -76,19 +79,18 @@ export default async function DashboardLayout({
             >
               {t("account")}
             </Link>
-            <form
-              action="/api/auth/logout"
-              method="post"
-              className="ms-auto"
-            >
-              <input type="hidden" name="locale" value={locale} />
-              <button
-                type="submit"
-                className="text-sm text-foreground/60 transition-colors hover:text-foreground"
-              >
-                {t("logout")}
-              </button>
-            </form>
+            <div className="ms-auto flex items-center gap-3">
+              <NotifBell initialUnread={unread} />
+              <form action="/api/auth/logout" method="post">
+                <input type="hidden" name="locale" value={locale} />
+                <button
+                  type="submit"
+                  className="text-sm text-foreground/60 transition-colors hover:text-foreground"
+                >
+                  {t("logout")}
+                </button>
+              </form>
+            </div>
           </nav>
           {children}
         </Container>
