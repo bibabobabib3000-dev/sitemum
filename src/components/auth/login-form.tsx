@@ -13,9 +13,35 @@ export function LoginForm({ locale, initialStatus }: LoginFormProps) {
   const t = useTranslations("login");
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
+  const [lastEmail, setLastEmail] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [error, setError] = useState<string | null>(
     initialStatusToMessage(initialStatus, t)
   );
+
+  async function requestLink(email: string) {
+    const res = await fetch("/api/auth/request-link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, locale }),
+    });
+    return (await res.json()) as
+      | { ok: true; data: { sent: boolean; reason?: string } }
+      | { ok: false; error: { code: string; message: string } };
+  }
+
+  function startResendCooldown() {
+    setResendCooldown(30);
+    const handle = window.setInterval(() => {
+      setResendCooldown((s) => {
+        if (s <= 1) {
+          window.clearInterval(handle);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+  }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -26,29 +52,36 @@ export function LoginForm({ locale, initialStatus }: LoginFormProps) {
     const email = String(data.get("email") ?? "").trim();
 
     try {
-      const res = await fetch("/api/auth/request-link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, locale }),
-      });
-      const json = (await res.json()) as
-        | { ok: true; data: { sent: boolean; reason?: string } }
-        | { ok: false; error: { code: string; message: string } };
-
-      if (!res.ok || !json.ok) {
-        const msg = !json.ok ? json.error.message : t("error");
-        setError(msg);
+      const json = await requestLink(email);
+      if (!json.ok) {
+        setError(json.error.message || t("error"));
         setSubmitting(false);
         return;
       }
-      if (!json.data.sent) {
-        // We intentionally do not reveal why nothing was sent (no DB, no
-        // Resend, send failure). Show the same "check your inbox" message so
-        // we never disclose whether an email exists in our system.
-        setSent(true);
+      // We intentionally do not reveal why nothing was sent (no DB, no
+      // Resend, send failure). Show the same "check your inbox" message so
+      // we never disclose whether an email exists in our system.
+      setLastEmail(email);
+      setSent(true);
+      startResendCooldown();
+    } catch {
+      setError(t("error"));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function onResend() {
+    if (!lastEmail || resendCooldown > 0 || submitting) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const json = await requestLink(lastEmail);
+      if (!json.ok) {
+        setError(json.error.message || t("error"));
         return;
       }
-      setSent(true);
+      startResendCooldown();
     } catch {
       setError(t("error"));
     } finally {
@@ -58,8 +91,47 @@ export function LoginForm({ locale, initialStatus }: LoginFormProps) {
 
   if (sent) {
     return (
-      <div className="rounded-2xl border border-foreground/15 bg-background/50 p-5 text-sm text-foreground/80">
-        {t("sent")}
+      <div className="grid gap-4">
+        <div className="rounded-2xl border border-foreground/15 bg-background/50 p-5 text-sm text-foreground/85">
+          <p>
+            {t.rich("sentTo", {
+              email: lastEmail ?? "",
+              strong: (chunks) => (
+                <strong className="text-foreground">{chunks}</strong>
+              ),
+            })}
+          </p>
+          <p className="mt-2 text-foreground/70">{t("sent")}</p>
+        </div>
+        <div className="flex items-center justify-between text-xs text-foreground/65">
+          <button
+            type="button"
+            onClick={onResend}
+            disabled={resendCooldown > 0 || submitting}
+            className="underline decoration-foreground/40 underline-offset-4 hover:decoration-foreground disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:decoration-foreground/40"
+          >
+            {resendCooldown > 0
+              ? t("resendIn", { seconds: resendCooldown })
+              : submitting
+                ? t("submitting")
+                : t("resend")}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSent(false);
+              setError(null);
+            }}
+            className="underline decoration-foreground/40 underline-offset-4 hover:decoration-foreground"
+          >
+            {t("changeEmail")}
+          </button>
+        </div>
+        {error ? (
+          <p role="alert" className="text-sm text-red-300">
+            {error}
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -103,6 +175,8 @@ function initialStatusToMessage(
       return t("statusMissing");
     case "disabled":
       return t("statusDisabled");
+    case "banned":
+      return t("statusBanned");
     default:
       return null;
   }

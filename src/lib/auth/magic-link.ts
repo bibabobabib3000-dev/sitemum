@@ -93,3 +93,21 @@ export async function consumeMagicLink(token: string): Promise<ConsumedToken | n
   if (!rows[0]) return null;
   return { userId: rows[0].user_id, email: rows[0].email };
 }
+
+/**
+ * True when `users.banned_at` is set for the given user. Lives here (next
+ * to the magic-link helpers) so the edge-runtime verify route doesn't
+ * pull in the much heavier admin module just to read a single column.
+ */
+export async function isUserBanned(userId: string): Promise<boolean> {
+  if (!isDbConfigured()) return false;
+  const sql = getDb()!;
+  const rows = (await sql`
+    select 1
+    from users
+    where id = ${userId}::uuid
+      and banned_at is not null
+    limit 1
+  `) as unknown[];
+  return rows.length > 0;
+}
