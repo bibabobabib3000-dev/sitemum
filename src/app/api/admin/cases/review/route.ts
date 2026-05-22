@@ -5,6 +5,7 @@ import { jsonErr, jsonOk } from "@/lib/api-response";
 import { getAdminContext, writeAuditLog } from "@/lib/auth/admin";
 import { applyCaseDecision, getCaseDetail } from "@/lib/admin/cases";
 import { notifyCaseDecision } from "@/lib/admin/notify-case";
+import { notify } from "@/lib/notifications/dispatch";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -103,7 +104,7 @@ export async function POST(req: NextRequest) {
   const baseUrl =
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "https://resoul.app";
   const dashboardUrl = `${baseUrl}/${before.locale}/dashboard`;
-  const notify = await notifyCaseDecision(
+  const notifyResult = await notifyCaseDecision(
     {
       email: before.email,
       fullName: before.fullName,
@@ -117,9 +118,28 @@ export async function POST(req: NextRequest) {
     },
   );
 
+  // In-app notification — writes a row into `notifications` so the
+  // student sees the bell badge update on their next dashboard visit.
+  // Channels here are intentionally limited to `in_app` because the
+  // existing notify-case helper already handled email/Telegram above.
+  try {
+    await notify({
+      userId: parsed.data.user_id,
+      kind:
+        parsed.data.decision === "approve" ? "case.approved" : "case.rejected",
+      channels: ["in_app"],
+      payload: {
+        notes: parsed.data.notes?.trim() || null,
+        dashboardUrl,
+      },
+    });
+  } catch (err) {
+    console.error("[admin:cases:notify_failed]", err);
+  }
+
   return jsonOk({
     approved: result.approved,
     approvedAt: result.approvedAt ? result.approvedAt.toISOString() : null,
-    notify,
+    notify: notifyResult,
   });
 }
